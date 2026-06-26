@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
 import { SemanalLog, Challenge } from '../types';
 import { compressImage } from '../utils/imageCompressor';
@@ -41,11 +42,36 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
     .sort((a, b) => parseInt(a.semana.replace('Sem ', '')) - parseInt(b.semana.replace('Sem ', '')));
 
   // Local transient states
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [localPh, setLocalPh] = useState<number>(currentLog?.ph ?? 5.5);
   const isUnsafePh = localPh > 5.0;
   const [localNotas, setLocalNotas] = useState<string>(currentLog?.notas ?? '');
   const [localFotos, setLocalFotos] = useState<string[]>(currentLog?.fotos ?? []);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
+
+  const handleDownloadChartPNG = async () => {
+    if (!chartContainerRef.current) return;
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(chartContainerRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `grafica_evolucion_ph_${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error al exportar gráfica PNG:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Synchronize local state when selectedWeek or semanas changes
   useEffect(() => {
@@ -214,7 +240,7 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
           </div>
         </div>
 
-        <div className="w-full h-56 pt-2">
+        <div ref={chartContainerRef} className="w-full h-56 pt-2 bg-white p-2 rounded-lg border border-slate-100">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 10, right: 15, left: -15, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -240,6 +266,18 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className="flex justify-end pt-2 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={handleDownloadChartPNG}
+            disabled={isExporting || chartData.length === 0}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold font-sans rounded-lg shadow-2xs transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isExporting ? 'Generando PNG...' : 'Descargar Gráfica (PNG)'}</span>
+          </button>
         </div>
       </div>
 
