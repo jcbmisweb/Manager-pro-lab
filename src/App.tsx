@@ -66,17 +66,14 @@ export default function App() {
   const [user, setUser] = useState<UserSession | null>(() => {
     try {
       const saved = localStorage.getItem('mpl_user_session');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Validamos que el objeto tenga cara de usuario
+        if (parsed && parsed.id) return parsed;
+      }
     } catch (e) {}
-    // Default to admin (Juan Codina) on first boot
-    return {
-      id: 'u-admin-1',
-      name: 'Juan Codina',
-      email: 'juan.codina@murciaeduca.es',
-      role: 'admin',
-      loggedIn: true,
-      estado: 'activo'
-    };
+    // En producción/Vercel, empezamos sin sesión para obligar al login de Google
+    return null;
   });
 
   // 2. IES Configuration
@@ -187,7 +184,20 @@ export default function App() {
   // III. SAVING AND STORAGE SYNCHRONIZATION
   // ----------------------------------------------------
   useEffect(() => {
-    getRedirectResult(auth).catch((err) => console.error("Error en resultado de redirección Google:", err));
+    // Manejar el resultado de una redirección previa (Login persistente tras recarga)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log("Login por redirección exitoso:", result.user.email);
+        }
+      })
+      .catch((err) => {
+        console.error("Error en resultado de redirección Google:", err);
+        if (err.code === 'auth/unauthorized-domain') {
+          alert("Error: Este dominio no está autorizado en la consola de Firebase. Por favor, asegúrate de añadir 'managerprolab.vercel.app' (sin https://) en Dominios Autorizados.");
+        }
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser({
@@ -198,7 +208,12 @@ export default function App() {
           loggedIn: true,
           estado: 'activo'
         });
+      } else {
+        // Solo limpiamos si no hay sesión simulada previa que queramos mantener (opcional)
+        // Pero para Google Auth, si onAuthStateChanged dice null, es que no hay sesión activa.
+        setUser(null);
       }
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -574,15 +589,21 @@ export default function App() {
                     <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Acceder con Google (Ventana)</span>
+                  <span>Entrar con Google (Ventana)</span>
                 </button>
 
                 <button
                   onClick={() => signInWithRedirect(auth, googleProvider)}
-                  className="w-full text-[11px] text-slate-500 hover:text-slate-800 underline transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium p-3 rounded-xl shadow-xs transition-all cursor-pointer text-sm"
                 >
-                  ¿Problemas con el login? Usa el modo Redirección
+                  <span>Usar modo Redirección (Recomendado)</span>
                 </button>
+
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-2 text-left">
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    <strong>¡Atención!</strong> Si el login se cierra solo, asegúrate de que en Firebase Console el dominio sea exactamente <code>managerprolab.vercel.app</code> (SIN https:// ni barras finales).
+                  </p>
+                </div>
               </div>
 
               <div className="border-t border-slate-100 pt-4">
