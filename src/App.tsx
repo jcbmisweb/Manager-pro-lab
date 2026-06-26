@@ -17,7 +17,7 @@ import { TasteLabSostenibilidad } from './components/TasteLabSostenibilidad';
 import { ChatMessenger } from './components/ChatMessenger';
 import { ReportViewer } from './components/ReportViewer';
 import { compressImage } from './utils/imageCompressor';
-import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged } from './firebase';
+import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
 
 import {
   Sliders,
@@ -187,6 +187,7 @@ export default function App() {
   // III. SAVING AND STORAGE SYNCHRONIZATION
   // ----------------------------------------------------
   useEffect(() => {
+    getRedirectResult(auth).catch((err) => console.error("Error en resultado de redirección Google:", err));
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser({
@@ -252,8 +253,15 @@ export default function App() {
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Error signing in with Google:", error);
+    } catch (error: any) {
+      console.error("Error signing in with Google popup:", error);
+      // Fallback automático a redirección si el navegador o Vercel bloquean ventanas emergentes
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirErr) {
+        console.error("Error signing in with redirect:", redirErr);
+        alert("No se pudo iniciar sesión con Google. Por favor, asegúrate de que el dominio exacto de Vercel esté añadido en Firebase -> Authentication -> Settings -> Authorized Domains.");
+      }
     }
   };
 
