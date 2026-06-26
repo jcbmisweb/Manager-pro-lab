@@ -105,7 +105,7 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
   const conversationMessages = mensajes.filter(m => 
     (m.emisorId === currentUser.id && m.receptorId === activeContactId) ||
     (m.emisorId === activeContactId && m.receptorId === currentUser.id)
-  );
+  ).sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
   const activeContact = usuarios.find(u => u.id === activeContactId);
 

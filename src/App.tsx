@@ -1038,6 +1038,12 @@ export default function App() {
                                   onChange={(e) => updateIESNombre(e.target.value)}
                                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:bg-white"
                                 />
+                                <button
+                                  onClick={() => updateDoc(doc(db, "settings", "iesConfig"), { nombre: iesConfig.nombre }).then(() => alert('Nombre guardado')).catch(console.error)}
+                                  className="mt-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase rounded cursor-pointer"
+                                >
+                                  Guardar Nombre
+                                </button>
                               </div>
                             </div>
                             
