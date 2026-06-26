@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "Usuario": {
+      "title": "Usuario",
+      "description": "Usuario del sistema",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "correo": { "type": "string" },
+        "rol": { "type": "string", "enum": ["admin", "profesor", "alumno"] },
+        "estado": { "type": "string", "enum": ["activo", "bloqueado", "suspendido", "eliminado"] },
+        "aulaId": { "type": "string" }
+      },
+      "required": ["id", "nombre", "correo", "rol", "estado"]
+    },
+    "Aula": {
+      "title": "Aula",
+      "description": "Aula o clase de laboratorio",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "profesorId": { "type": "string" }
+      },
+      "required": ["id", "nombre", "profesorId"]
+    },
+    "Proyecto": {
+      "title": "Proyecto",
+      "description": "Proyecto de bioproceso / reto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "titulo": { "type": "string" },
+        "alumnoId": { "type": "string" }
+      },
+      "required": ["id", "titulo", "alumnoId"]
+    },
+    "Mensaje": {
+      "title": "Mensaje",
+      "description": "Mensaje de chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "emisorId": { "type": "string" },
+        "receptorId": { "type": "string" },
+        "mensaje": { "type": "string" },
+        "fecha": { "type": "string" },
+        "leido": { "type": "boolean" }
+      },
+      "required": ["id", "emisorId", "receptorId", "mensaje", "fecha", "leido"]
+    },
+    "IESConfig": {
+      "title": "IESConfig",
+      "description": "Configuración institucional del IES",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "logo": { "type": "string" }
+      },
+      "required": ["nombre", "logo"]
+    }
+  },
+  "firestore": {
+    "/usuarios/{userId}": {
+      "schema": { "$ref": "#/entities/Usuario" },
+      "description": "Colección de usuarios"
+    },
+    "/aulas/{aulaId}": {
+      "schema": { "$ref": "#/entities/Aula" },
+      "description": "Colección de aulas"
+    },
+    "/proyectos/{proyectoId}": {
+      "schema": { "$ref": "#/entities/Proyecto" },
+      "description": "Colección de proyectos"
+    },
+    "/mensajes/{mensajeId}": {
+      "schema": { "$ref": "#/entities/Mensaje" },
+      "description": "Colección de mensajes"
+    },
+    "/settings/iesConfig": {
+      "schema": { "$ref": "#/entities/IESConfig" },
+      "description": "Documento de configuración institucional"
+    }
+  }
+}

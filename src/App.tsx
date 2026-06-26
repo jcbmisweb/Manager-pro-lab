@@ -120,6 +120,9 @@ export default function App() {
     ];
   });
 
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+
   // 5. Projects list (All student projects)
   const [proyectos, setProyectos] = useState<any[]>(() => {
     try {
@@ -190,25 +193,43 @@ export default function App() {
   // FIREBASE INITIAL DATA SYNC
   // ----------------------------------------------------
   useEffect(() => {
+    let unsubs: (() => void)[] = [];
+
     // Escuchar configuraciones institucionales
     const unsubIes = onSnapshot(doc(db, "settings", "iesConfig"), (snap) => {
-      if (snap.exists()) setIesConfig(snap.data() as IESConfig);
-    });
+      if (snap.exists()) {
+        const data = snap.data() as IESConfig;
+        setIesConfig(prev => {
+          if (prev.nombre === data.nombre && prev.logo === data.logo) return prev;
+          return data;
+        });
+      } else {
+        setDoc(doc(db, "settings", "iesConfig"), {
+          nombre: 'IES Valle de Leiva',
+          logo: ''
+        }, { merge: true }).catch(console.error);
+      }
+    }, (err) => console.warn("iesConfig listener error:", err));
+    unsubs.push(unsubIes);
 
     // Migración inicial para mover listas únicas (settings/X) a colecciones reales
     const runMigration = async () => {
       const migrateCollection = async (docName: string, colName: string) => {
-        const snap = await getDoc(doc(db, "settings", docName));
-        if (snap.exists()) {
-          const list = snap.data().list || [];
-          const batch = writeBatch(db);
-          list.forEach((item: any) => {
-            if (item.id) {
-              batch.set(doc(db, colName, item.id), item);
-            }
-          });
-          batch.delete(snap.ref); // Clean up old setting doc
-          await batch.commit().catch(console.error);
+        try {
+          const snap = await getDoc(doc(db, "settings", docName));
+          if (snap.exists()) {
+            const list = snap.data().list || [];
+            const batch = writeBatch(db);
+            list.forEach((item: any) => {
+              if (item.id) {
+                batch.set(doc(db, colName, item.id), item);
+              }
+            });
+            batch.delete(snap.ref); // Clean up old setting doc
+            await batch.commit().catch(console.error);
+          }
+        } catch (e) {
+          console.warn(`Migration error for ${docName}:`, e);
         }
       };
       await migrateCollection("usuarios", "usuarios");
@@ -218,22 +239,23 @@ export default function App() {
 
     runMigration().then(() => {
       // Configurar listeners en tiempo real para las colecciones DESPUÉS de migrar
-      onSnapshot(collection(db, "usuarios"), (snapshot) => {
+      const u1 = onSnapshot(collection(db, "usuarios"), (snapshot) => {
         setUsuarios(snapshot.docs.map(doc => doc.data() as Usuario));
-      });
-      onSnapshot(collection(db, "aulas"), (snapshot) => {
+      }, (err) => console.warn("usuarios listener error:", err));
+      const u2 = onSnapshot(collection(db, "aulas"), (snapshot) => {
         setAulas(snapshot.docs.map(doc => doc.data() as Aula));
-      });
-      onSnapshot(collection(db, "proyectos"), (snapshot) => {
+      }, (err) => console.warn("aulas listener error:", err));
+      const u3 = onSnapshot(collection(db, "proyectos"), (snapshot) => {
         setProyectos(snapshot.docs.map(doc => doc.data() as Challenge));
-      });
-      onSnapshot(collection(db, "mensajes"), (snapshot) => {
+      }, (err) => console.warn("proyectos listener error:", err));
+      const u4 = onSnapshot(collection(db, "mensajes"), (snapshot) => {
         setMensajes(snapshot.docs.map(doc => doc.data() as any));
-      });
-    });
+      }, (err) => console.warn("mensajes listener error:", err));
+      unsubs.push(u1, u2, u3, u4);
+    }).catch(err => console.warn("runMigration promise error:", err));
 
     return () => {
-      unsubIes();
+      unsubs.forEach(fn => fn());
     };
   }, []);
 
@@ -258,47 +280,59 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userEmail = (firebaseUser.email || '').toLowerCase().trim();
-        
-        // Verificar en Firestore si el usuario ya existe
-        const userRef = doc(db, "usuarios", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-
-        let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
-        let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
-        let currentUserName = firebaseUser.displayName || 'Usuario Google';
-
-        if (!userSnap.exists()) {
-          // El usuario es nuevo en el sistema
-          const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
-          currentUserRole = isAdmin ? 'admin' : 'alumno';
-
-          const newUser: Usuario = {
-            id: firebaseUser.uid,
-            nombre: currentUserName,
-            correo: userEmail,
-            rol: currentUserRole,
-            estado: 'activo'
-          };
+        try {
+          const userEmail = (firebaseUser.email || '').toLowerCase().trim();
           
-          // Guardar en Firestore directamente
-          await setDoc(userRef, newUser).catch(console.error);
-        } else {
-          // El usuario ya existe
-          const data = userSnap.data() as Usuario;
-          currentUserRole = data.rol;
-          currentUserEstado = data.estado || 'activo';
-          currentUserName = data.nombre || currentUserName;
-        }
+          // Verificar en Firestore si el usuario ya existe
+          const userRef = doc(db, "usuarios", firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
 
-        setUser({
-          id: firebaseUser.uid,
-          name: currentUserName,
-          email: userEmail,
-          role: currentUserRole,
-          loggedIn: true,
-          estado: currentUserEstado
-        });
+          let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
+          let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
+          let currentUserName = firebaseUser.displayName || 'Usuario Google';
+
+          if (!userSnap.exists()) {
+            // El usuario es nuevo en el sistema
+            const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
+            currentUserRole = isAdmin ? 'admin' : 'alumno';
+
+            const newUser: Usuario = {
+              id: firebaseUser.uid,
+              nombre: currentUserName,
+              correo: userEmail,
+              rol: currentUserRole,
+              estado: 'activo'
+            };
+            
+            // Guardar en Firestore directamente
+            await setDoc(userRef, newUser).catch(console.error);
+          } else {
+            // El usuario ya existe
+            const data = userSnap.data() as Usuario;
+            currentUserRole = data.rol;
+            currentUserEstado = data.estado || 'activo';
+            currentUserName = data.nombre || currentUserName;
+          }
+
+          setUser({
+            id: firebaseUser.uid,
+            name: currentUserName,
+            email: userEmail,
+            role: currentUserRole,
+            loggedIn: true,
+            estado: currentUserEstado
+          });
+        } catch (e) {
+          console.error("Error cargando perfil de usuario:", e);
+          setUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Usuario Google',
+            email: firebaseUser.email || '',
+            role: 'alumno',
+            loggedIn: true,
+            estado: 'activo'
+          });
+        }
       } else {
         setUser(null);
       }
@@ -340,14 +374,14 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleSaveName = async () => {
+    if (!user) return;
     try {
-      await signOut(auth);
-      setUser(null);
-      setOpenProyectoId(null);
-      setOpenProyectoReadOnly(false);
+      await updateDoc(doc(db, "usuarios", user.id), { nombre: editName });
+      setUser({ ...user, name: editName });
+      setIsEditingName(false);
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Error updating name:", error);
     }
   };
 
@@ -664,7 +698,28 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="flex items-center gap-1.5 justify-end">
-                  <span className="font-bold text-xs text-slate-800">{user.name}</span>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="text-xs border rounded px-1 w-32"
+                      />
+                      <button onClick={handleSaveName} className="text-[10px] bg-emerald-500 text-white px-1.5 rounded">Guardar</button>
+                      <button onClick={() => setIsEditingName(false)} className="text-[10px] bg-slate-500 text-white px-1.5 rounded">X</button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-bold text-xs text-slate-800">{user.name}</span>
+                      <button 
+                        onClick={() => { setEditName(user.name); setIsEditingName(true); }}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <Settings className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                     user.role === 'admin' 
                       ? 'bg-red-50 text-red-700 border border-red-200' 

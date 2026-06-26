@@ -27,7 +27,7 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "mensajes"), (snap) => {
       setMensajes(snap.docs.map(doc => doc.data() as Mensaje));
-    });
+    }, err => console.warn("ChatMessenger snap err:", err));
     return () => unsub();
   }, []);
 
