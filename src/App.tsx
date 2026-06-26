@@ -76,6 +76,8 @@ export default function App() {
     return null;
   });
 
+  const [isLoading, setIsLoading] = useState(true);
+
   // 2. IES Configuration
   const [iesConfig, setIesConfig] = useState<IESConfig>(() => {
     try {
@@ -194,7 +196,8 @@ export default function App() {
       .catch((err) => {
         console.error("Error en resultado de redirección Google:", err);
         if (err.code === 'auth/unauthorized-domain') {
-          alert("Error: Este dominio no está autorizado en la consola de Firebase. Por favor, asegúrate de añadir 'managerprolab.vercel.app' (sin https://) en Dominios Autorizados.");
+          const currentDomain = window.location.hostname;
+          alert(`Error: El dominio '${currentDomain}' no está autorizado en la consola de Firebase. Por favor, añádelo en Authentication -> Settings -> Authorized Domains.`);
         }
       });
 
@@ -273,9 +276,10 @@ export default function App() {
       // Fallback automático a redirección si el navegador o Vercel bloquean ventanas emergentes
       try {
         await signInWithRedirect(auth, googleProvider);
-      } catch (redirErr) {
+      } catch (redirErr: any) {
         console.error("Error signing in with redirect:", redirErr);
-        alert("No se pudo iniciar sesión con Google. Por favor, asegúrate de que el dominio exacto de Vercel esté añadido en Firebase -> Authentication -> Settings -> Authorized Domains.");
+        const currentDomain = window.location.hostname;
+        alert(`No se pudo iniciar sesión. Por favor, asegúrate de que el dominio '${currentDomain}' esté añadido en Firebase -> Authentication -> Settings -> Authorized Domains.`);
       }
     }
   };
@@ -566,8 +570,13 @@ export default function App() {
       {/* 2. MAIN HUB ROUTING CONTENT */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* If no user session is loaded */}
-        {!user ? (
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+            <GraduationCap className="w-12 h-12 text-slate-300 animate-spin-slow mb-4" />
+            <p className="text-slate-400 font-mono text-xs uppercase tracking-widest">Sincronizando con Firebase...</p>
+          </div>
+        ) : !user ? (
           <div className="max-w-md mx-auto bg-white border border-slate-200 p-8 rounded-2xl shadow-sm text-center space-y-6 mt-12">
             <GraduationCap className="w-12 h-12 text-slate-900 mx-auto" />
             <div>
@@ -601,7 +610,14 @@ export default function App() {
 
                 <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-2 text-left">
                   <p className="text-[11px] text-amber-800 leading-relaxed">
-                    <strong>¡Atención!</strong> Si el login se cierra solo, asegúrate de que en Firebase Console el dominio sea exactamente <code>managerprolab.vercel.app</code> (SIN https:// ni barras finales).
+                    <strong>¡Atención!</strong> Si el login falla, asegúrate de añadir estos dominios en Firebase Console (Authentication &gt; Settings):
+                  </p>
+                  <ul className="text-[10px] text-amber-700 mt-1 list-disc list-inside font-mono">
+                    <li>managerprolab.vercel.app</li>
+                    <li>{window.location.hostname}</li>
+                  </ul>
+                  <p className="text-[10px] text-amber-600 mt-1 italic">
+                    * Sin https:// ni barras finales.
                   </p>
                 </div>
               </div>
