@@ -272,14 +272,21 @@ export default function App() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
-      console.error("Error signing in with Google popup:", error);
-      // Fallback automático a redirección si el navegador o Vercel bloquean ventanas emergentes
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (redirErr: any) {
-        console.error("Error signing in with redirect:", redirErr);
+      console.error("Error completo de login:", error);
+      
+      if (error.code === 'auth/popup-blocked') {
+        alert("El navegador bloqueó la ventana emergente. Por favor, permite las popups para este sitio o intenta de nuevo.");
+      } else if (error.code === 'auth/unauthorized-domain') {
         const currentDomain = window.location.hostname;
-        alert(`No se pudo iniciar sesión. Por favor, asegúrate de que el dominio '${currentDomain}' esté añadido en Firebase -> Authentication -> Settings -> Authorized Domains.`);
+        alert(`Error: El dominio '${currentDomain}' no está autorizado en tu consola de Firebase. Debes añadirlo en Authentication > Settings > Authorized Domains.`);
+      } else {
+        // Intentar redirección como último recurso
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirErr: any) {
+          console.error("Error en redirección:", redirErr);
+          alert(`Error al iniciar sesión: ${error.message || "Error desconocido"}. Revisa la consola para más detalles.`);
+        }
       }
     }
   };
