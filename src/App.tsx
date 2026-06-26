@@ -279,6 +279,7 @@ export default function App() {
       });
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Firebase Auth State Changed:", firebaseUser);
       if (firebaseUser) {
         try {
           const userEmail = (firebaseUser.email || '').toLowerCase().trim();
@@ -374,6 +375,17 @@ export default function App() {
           alert(`Error al iniciar sesión: ${error.message || "Error desconocido"}. Revisa la consola para más detalles.`);
         }
       }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setOpenProyectoId(null);
+      setOpenProyectoReadOnly(false);
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
