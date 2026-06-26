@@ -219,3 +219,22 @@ export const getInitialStateForChallenge = (challenge: Challenge): RetoState => 
 
 export const INITIAL_STATE: RetoState = getInitialStateForChallenge(CHALLENGES[0]);
 
+export interface Project {
+  id: string;
+  challengeId: string;
+  block: 'A' | 'B' | 'C';
+  title: string;
+  objectives: string[];
+  technicalData: Record<string, string>;
+  infographicUrl: string;
+  status: 'en curso' | 'completado';
+}
+
+export interface NotebookEntry {
+  id: string;
+  projectId: string;
+  date: string;
+  notes: string;
+  photoUrl?: string;
+}
+
