@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, MessageSquare, Check, CheckCheck, Clock, Paperclip } from 'lucide-react';
 import { Mensaje, Usuario, Aula } from '../types';
+import { db } from '../firebase';
+import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 
 interface ChatMessengerProps {
   currentUser: {
@@ -15,43 +17,19 @@ interface ChatMessengerProps {
 }
 
 export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatMessengerProps) {
-  const [mensajes, setMensajes] = useState<Mensaje[]>(() => {
-    try {
-      const saved = localStorage.getItem('mpl_mensajes_chat');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    // Pre-populate some demo messages for a highly immersive experience
-    return [
-      {
-        id: 'm1',
-        emisorId: 'u-stud-1',
-        receptorId: 'u-prof-1',
-        proyectoId: 'reto-01a',
-        mensaje: 'Profesor, he notado que el pH ha bajado bastante rápido en esta primera semana. ¿Es normal?',
-        fecha: new Date(Date.now() - 3600000 * 5).toISOString(),
-        leido: true
-      },
-      {
-        id: 'm2',
-        emisorId: 'u-prof-1',
-        receptorId: 'u-stud-1',
-        proyectoId: 'reto-01a',
-        mensaje: 'Hola Ana, sí, en el queso de soya la acidificación es rápida al inicio debido a la actividad bacteriana. Sigue controlando la sinéresis.',
-        fecha: new Date(Date.now() - 3600000 * 4).toISOString(),
-        leido: true
-      }
-    ];
-  });
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
 
   const [activeContactId, setActiveContactId] = useState<string>('');
   const [nuevoMensajeText, setNuevoMensajeText] = useState('');
   const [mensajeProyectoId, setMensajeProyectoId] = useState<string>('general');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem('mpl_mensajes_chat', JSON.stringify(mensajes));
-  }, [mensajes]);
+    const unsub = onSnapshot(collection(db, "mensajes"), (snap) => {
+      setMensajes(snap.docs.map(doc => doc.data() as Mensaje));
+    });
+    return () => unsub();
+  }, []);
 
   // For teachers, find students in their classrooms. For students, find their assigned teacher.
   const myAssignedAulas = aulas.filter(a => a.profesorId === currentUser.id);
@@ -91,17 +69,11 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
   // Mark incoming messages from activeContact as read
   useEffect(() => {
     if (activeContactId) {
-      const updated = mensajes.map(m => {
+      mensajes.forEach(m => {
         if (m.emisorId === activeContactId && m.receptorId === currentUser.id && !m.leido) {
-          return { ...m, leido: true };
+          updateDoc(doc(db, "mensajes", m.id), { leido: true }).catch(console.error);
         }
-        return m;
       });
-      // Check if actually changed to prevent infinite loops
-      const hasChanges = JSON.stringify(updated) !== JSON.stringify(mensajes);
-      if (hasChanges) {
-        setMensajes(updated);
-      }
     }
   }, [activeContactId, mensajes, currentUser.id]);
 
@@ -114,8 +86,9 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
     e.preventDefault();
     if (!nuevoMensajeText.trim() || !activeContactId) return;
 
+    const msgId = 'm-' + Date.now();
     const msg: Mensaje = {
-      id: 'm-' + Date.now(),
+      id: msgId,
       emisorId: currentUser.id,
       receptorId: activeContactId,
       proyectoId: mensajeProyectoId === 'general' ? undefined : mensajeProyectoId,
@@ -124,7 +97,7 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
       leido: false
     };
 
-    setMensajes(prev => [...prev, msg]);
+    setDoc(doc(db, "mensajes", msgId), msg).catch(console.error);
     setNuevoMensajeText('');
   };
 

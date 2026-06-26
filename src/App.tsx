@@ -19,7 +19,7 @@ import { ReportViewer } from './components/ReportViewer';
 import { compressImage } from './utils/imageCompressor';
 import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
 import { db } from './firebase';
-import { collection, getDocs, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, getDoc, deleteDoc, doc, writeBatch, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 
 import {
   Sliders,
@@ -182,7 +182,60 @@ export default function App() {
 
   // Classroom creation helper states
   const [nuevaAulaNombre, setNuevaAulaNombre] = useState('');
-  const [nuevaAulaProfId, setNuevaAulaProfId] = useState('u-prof-1');
+  const [nuevaAulaProfId, setNuevaAulaProfId] = useState('');
+
+  const [mensajes, setMensajes] = useState<any[]>([]);
+
+  // ----------------------------------------------------
+  // FIREBASE INITIAL DATA SYNC
+  // ----------------------------------------------------
+  useEffect(() => {
+    // Escuchar configuraciones institucionales
+    const unsubIes = onSnapshot(doc(db, "settings", "iesConfig"), (snap) => {
+      if (snap.exists()) setIesConfig(snap.data() as IESConfig);
+    });
+
+    // Migración inicial para mover listas únicas (settings/X) a colecciones reales
+    const runMigration = async () => {
+      const migrateCollection = async (docName: string, colName: string) => {
+        const snap = await getDoc(doc(db, "settings", docName));
+        if (snap.exists()) {
+          const list = snap.data().list || [];
+          const batch = writeBatch(db);
+          list.forEach((item: any) => {
+            if (item.id) {
+              batch.set(doc(db, colName, item.id), item);
+            }
+          });
+          batch.delete(snap.ref); // Clean up old setting doc
+          await batch.commit().catch(console.error);
+        }
+      };
+      await migrateCollection("usuarios", "usuarios");
+      await migrateCollection("aulas", "aulas");
+      await migrateCollection("proyectos", "proyectos");
+    };
+
+    runMigration().then(() => {
+      // Configurar listeners en tiempo real para las colecciones DESPUÉS de migrar
+      onSnapshot(collection(db, "usuarios"), (snapshot) => {
+        setUsuarios(snapshot.docs.map(doc => doc.data() as Usuario));
+      });
+      onSnapshot(collection(db, "aulas"), (snapshot) => {
+        setAulas(snapshot.docs.map(doc => doc.data() as Aula));
+      });
+      onSnapshot(collection(db, "proyectos"), (snapshot) => {
+        setProyectos(snapshot.docs.map(doc => doc.data() as Challenge));
+      });
+      onSnapshot(collection(db, "mensajes"), (snapshot) => {
+        setMensajes(snapshot.docs.map(doc => doc.data() as any));
+      });
+    });
+
+    return () => {
+      unsubIes();
+    };
+  }, []);
 
   // ----------------------------------------------------
   // III. SAVING AND STORAGE SYNCHRONIZATION
@@ -203,50 +256,48 @@ export default function App() {
         }
       });
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userEmail = (firebaseUser.email || '').toLowerCase().trim();
+        
+        // Verificar en Firestore si el usuario ya existe
+        const userRef = doc(db, "usuarios", firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
 
-        setUsuarios(prev => {
-          const existingUser = prev.find(u => u.id === firebaseUser.uid || u.correo === userEmail);
-          let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
-          let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
-          let nextUsers = prev;
+        let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
+        let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
+        let currentUserName = firebaseUser.displayName || 'Usuario Google';
 
-          if (!existingUser) {
-            // New user, assign default role
-            const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
-            const isProf = userEmail.includes('prof');
-            currentUserRole = isAdmin ? 'admin' : (isProf ? 'profesor' : 'alumno');
-            
-            const newUser: Usuario = {
-              id: firebaseUser.uid,
-              nombre: firebaseUser.displayName || 'Usuario Google',
-              correo: userEmail,
-              rol: currentUserRole,
-              estado: 'activo'
-            };
-            nextUsers = [...prev, newUser];
-          } else {
-            // Existing user, keep their role and state
-            currentUserRole = existingUser.rol;
-            currentUserEstado = existingUser.estado || 'activo';
-            // Update their ID if they are logging in for the first time with an email that was pre-registered
-            if (existingUser.id !== firebaseUser.uid) {
-               nextUsers = prev.map(u => u.correo === userEmail ? { ...u, id: firebaseUser.uid } : u);
-            }
-          }
+        if (!userSnap.exists()) {
+          // El usuario es nuevo en el sistema
+          const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
+          currentUserRole = isAdmin ? 'admin' : 'alumno';
 
-          setUser({
+          const newUser: Usuario = {
             id: firebaseUser.uid,
-            name: firebaseUser.displayName || existingUser?.nombre || 'Usuario Google',
-            email: userEmail,
-            role: currentUserRole,
-            loggedIn: true,
-            estado: currentUserEstado
-          });
+            nombre: currentUserName,
+            correo: userEmail,
+            rol: currentUserRole,
+            estado: 'activo'
+          };
+          
+          // Guardar en Firestore directamente
+          await setDoc(userRef, newUser).catch(console.error);
+        } else {
+          // El usuario ya existe
+          const data = userSnap.data() as Usuario;
+          currentUserRole = data.rol;
+          currentUserEstado = data.estado || 'activo';
+          currentUserName = data.nombre || currentUserName;
+        }
 
-          return nextUsers;
+        setUser({
+          id: firebaseUser.uid,
+          name: currentUserName,
+          email: userEmail,
+          role: currentUserRole,
+          loggedIn: true,
+          estado: currentUserEstado
         });
       } else {
         setUser(null);
@@ -260,22 +311,8 @@ export default function App() {
     localStorage.setItem('mpl_user_session', JSON.stringify(user));
   }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem('mpl_ies_config', JSON.stringify(iesConfig));
-  }, [iesConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('mpl_aulas', JSON.stringify(aulas));
-  }, [aulas]);
-
-  useEffect(() => {
-    localStorage.setItem('mpl_usuarios', JSON.stringify(usuarios));
-  }, [usuarios]);
-
-  useEffect(() => {
-    localStorage.setItem('mpl_proyectos_all', JSON.stringify(proyectos));
-  }, [proyectos]);
-
+  // Firebase synchronization is now handled via collections
+  
   // ----------------------------------------------------
   // IV. CORE SYSTEM OPERATIONS (HANDLERS)
   // ----------------------------------------------------
@@ -379,7 +416,7 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = async () => {
         const compressed = await compressImage(reader.result as string, 300, 150, 0.85);
-        setIesConfig(prev => ({ ...prev, logo: compressed }));
+        updateDoc(doc(db, "settings", "iesConfig"), { logo: compressed }).catch(console.error);
       };
       reader.readAsDataURL(file);
     }
@@ -392,7 +429,8 @@ export default function App() {
       alert('No se puede cambiar el rol del administrador principal.');
       return;
     }
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, rol, aulaId: rol !== 'alumno' ? undefined : u.aulaId } : u));
+    const newAulaId = rol !== 'alumno' ? null : userToChange?.aulaId || null;
+    updateDoc(doc(db, "usuarios", userId), { rol, aulaId: newAulaId }).catch(console.error);
     // If we changed current logged in user role
     if (user && user.id === userId) {
       setUser(prev => prev ? { ...prev, role: rol } : null);
@@ -405,7 +443,7 @@ export default function App() {
       alert('No se puede cambiar el estado a inactivo para el administrador principal.');
       return;
     }
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, estado } : u));
+    updateDoc(doc(db, "usuarios", userId), { estado }).catch(console.error);
     // If we changed current logged in user status
     if (user && user.id === userId) {
       if (estado !== 'activo') {
@@ -421,7 +459,7 @@ export default function App() {
       return;
     }
     if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente a este usuario?')) {
-      setUsuarios(prev => prev.filter(u => u.id !== userId));
+      deleteDoc(doc(db, "usuarios", userId)).catch(console.error);
       if (user && user.id === userId) {
         handleLogout();
       }
@@ -429,20 +467,35 @@ export default function App() {
   };
 
   const assignStudentToAula = (studentId: string, aulaId: string) => {
-    setUsuarios(prev => prev.map(u => u.id === studentId ? { ...u, aulaId } : u));
+    updateDoc(doc(db, "usuarios", studentId), { aulaId }).catch(console.error);
   };
 
   // Create classrooms
   const handleCrearAula = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevaAulaNombre.trim()) return;
+    if (!nuevaAulaNombre.trim() || !nuevaAulaProfId) {
+      alert('Debes ingresar un nombre para el aula y seleccionar un profesor a cargo.');
+      return;
+    }
     const newAula: Aula = {
       id: 'aula-' + Date.now(),
       nombre: nuevaAulaNombre.trim(),
       profesorId: nuevaAulaProfId
     };
-    setAulas(prev => [...prev, newAula]);
+    setDoc(doc(db, "aulas", newAula.id), newAula).catch(console.error);
     setNuevaAulaNombre('');
+    setNuevaAulaProfId('');
+  };
+
+  const handleEliminarAula = (aulaId: string) => {
+    const studentsInAula = usuarios.filter(u => u.aulaId === aulaId);
+    if (studentsInAula.length > 0) {
+      alert("No se puede eliminar un aula que tiene alumnos inscritos.");
+      return;
+    }
+    if (window.confirm("¿Estás seguro de que deseas eliminar esta aula? Esta acción no se puede deshacer.")) {
+      deleteDoc(doc(db, "aulas", aulaId)).catch(console.error);
+    }
   };
 
   // Student Project initiation
@@ -483,7 +536,7 @@ export default function App() {
       sensorial: { firmeza: 3, uniformidad: 3, acidez: 3, persistencia: 3 }
     };
 
-    setProyectos(prev => [nuevoP, ...prev]);
+    setDoc(doc(db, "proyectos", nuevoP.id), nuevoP).catch(console.error);
     setOpenProyectoId(nuevoP.id);
     setOpenProyectoReadOnly(false);
     setSelectedWeek(1);
@@ -492,17 +545,12 @@ export default function App() {
 
   // Modify active project configs
   const handleSaveInitialConfig = (peso: number, inoculante: string) => {
-    setProyectos(prev => prev.map(p => {
-      if (p.id === openProyectoId) {
-        return {
-          ...p,
-          pesoInicial: peso,
-          tipoInoculante: inoculante,
-          started: true
-        };
-      }
-      return p;
-    }));
+    if (!openProyectoId) return;
+    updateDoc(doc(db, "proyectos", openProyectoId), {
+      pesoInicial: peso,
+      tipoInoculante: inoculante,
+      started: true
+    }).catch(console.error);
   };
 
   const handleResetExperiment = () => {
@@ -521,57 +569,48 @@ export default function App() {
       };
     }
 
-    setProyectos(prev => prev.map(p => {
-      if (p.id === openProyectoId) {
-        return {
-          ...p,
-          started: false,
-          semanas: resetSemanas,
-          pesoFinal: null,
-          sensorial: { firmeza: 3, uniformidad: 3, acidez: 3, persistencia: 3 }
-        };
-      }
-      return p;
-    }));
+    updateDoc(doc(db, "proyectos", currentProj.id), {
+      started: false,
+      semanas: resetSemanas,
+      pesoFinal: null,
+      sensorial: { firmeza: 3, uniformidad: 3, acidez: 3, persistencia: 3 }
+    }).catch(console.error);
+    
     setSelectedWeek(1);
     setActiveLabTab('bitacora');
   };
 
   // Save week details
   const handleSaveWeek = (week: number, ph: number, notas: string, fotos?: string[]) => {
-    setProyectos(prev => prev.map(p => {
-      if (p.id === openProyectoId) {
-        const updatedSemanas = { ...p.semanas };
-        updatedSemanas[week] = {
-          ...updatedSemanas[week],
-          ph,
-          notas,
-          completado: true,
-          fechaRegistro: new Date().toISOString(),
-          fotos: fotos || []
-        };
-        return {
-          ...p,
-          semanas: updatedSemanas
-        };
-      }
-      return p;
-    }));
+    const currentProj = proyectos.find(p => p.id === openProyectoId);
+    if (!currentProj) return;
+    
+    const updatedSemanas = { ...currentProj.semanas };
+    updatedSemanas[week] = {
+      ...updatedSemanas[week],
+      ph,
+      notas,
+      completado: true,
+      fechaRegistro: new Date().toISOString(),
+      fotos: fotos || []
+    };
+    
+    updateDoc(doc(db, "proyectos", currentProj.id), {
+      semanas: updatedSemanas
+    }).catch(console.error);
+    
     alert("¡Semana guardada con éxito en la bitácora técnica!");
   };
 
   // Save TasteLab evaluation
   const handleSaveFinal = (pesoFinal: number, sensorial: SensorialEvaluation) => {
-    setProyectos(prev => prev.map(p => {
-      if (p.id === openProyectoId) {
-        return {
-          ...p,
-          pesoFinal,
-          sensorial
-        };
-      }
-      return p;
-    }));
+    if (!openProyectoId) return;
+    
+    updateDoc(doc(db, "proyectos", openProyectoId), {
+      pesoFinal,
+      sensorial
+    }).catch(console.error);
+    
     alert("Análisis Sensorial y métricas de sostenibilidad guardadas con éxito.");
   };
 
@@ -583,8 +622,7 @@ export default function App() {
 
   // Find conversations and unread counts for messenger alert
   const unreadMessagesCount = user ? 
-    JSON.parse(localStorage.getItem('mpl_mensajes_chat') || '[]')
-      .filter((m: any) => m.receptorId === user.id && !m.leido).length : 0;
+    mensajes.filter((m: any) => m.receptorId === user.id && !m.leido).length : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800 flex flex-col justify-between">
@@ -1014,7 +1052,8 @@ export default function App() {
                                   onChange={(e) => setNuevaAulaProfId(e.target.value)}
                                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
                                 >
-                                  {usuarios.filter(u => u.rol === 'profesor').map(p => (
+                                  <option value="">-- Seleccionar --</option>
+                                  {usuarios.filter(u => u.rol === 'profesor' || u.rol === 'admin').map(p => (
                                     <option key={p.id} value={p.id}>{p.nombre}</option>
                                   ))}
                                 </select>
@@ -1041,9 +1080,20 @@ export default function App() {
                                         Profesor: <span className="font-semibold">{prof?.nombre || 'No asignado'}</span> • {studentsCount} Alumnos inscritos
                                       </p>
                                     </div>
-                                    <span className="text-[10px] bg-slate-100 text-slate-600 font-mono font-bold px-2 py-0.5 rounded">
-                                      {a.id}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] bg-slate-100 text-slate-600 font-mono font-bold px-2 py-0.5 rounded">
+                                        {a.id}
+                                      </span>
+                                      {studentsCount === 0 && (
+                                        <button
+                                          onClick={() => handleEliminarAula(a.id)}
+                                          title="Eliminar aula"
+                                          className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -1144,7 +1194,7 @@ export default function App() {
                 )}
 
                 {/* 🍎 B. PROFESSOR DASHBOARD PANEL */}
-                {user.role === 'profesor' && (
+                {(user.role === 'profesor' || user.role === 'admin') && (
                   <div className="space-y-6">
                     
                     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-3xs">
