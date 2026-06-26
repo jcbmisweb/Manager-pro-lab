@@ -17,6 +17,7 @@ import { TasteLabSostenibilidad } from './components/TasteLabSostenibilidad';
 import { ChatMessenger } from './components/ChatMessenger';
 import { ReportViewer } from './components/ReportViewer';
 import { compressImage } from './utils/imageCompressor';
+import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged } from './firebase';
 
 import {
   Sliders,
@@ -186,6 +187,22 @@ export default function App() {
   // III. SAVING AND STORAGE SYNCHRONIZATION
   // ----------------------------------------------------
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Usuario Google',
+          email: firebaseUser.email || '',
+          role: firebaseUser.email?.includes('admin') ? 'admin' : (firebaseUser.email?.includes('prof') ? 'profesor' : 'estudiante'),
+          loggedIn: true,
+          estado: 'activo'
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('mpl_user_session', JSON.stringify(user));
   }, [user]);
 
@@ -232,10 +249,23 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setOpenProyectoId(null);
-    setOpenProyectoReadOnly(false);
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setOpenProyectoId(null);
+      setOpenProyectoReadOnly(false);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   // IES name/logo modification (Admin)
@@ -518,26 +548,40 @@ export default function App() {
           <div className="max-w-md mx-auto bg-white border border-slate-200 p-8 rounded-2xl shadow-sm text-center space-y-6 mt-12">
             <GraduationCap className="w-12 h-12 text-slate-900 mx-auto" />
             <div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Acceso a Bioprocesos IES</h2>
-              <p className="text-xs text-slate-500 mt-1">Por favor selecciona un rol para ingresar a la simulación del sistema.</p>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Acceso Seguro a Bioprocesos IES</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Inicia sesión de forma segura con tu cuenta de Google (Firebase Authentication) para sincronizar tus proyectos de bioprocesos.
+              </p>
             </div>
             
-            <div className="space-y-2 pt-2">
-              {usuarios.map(u => (
-                <button
-                  key={u.id}
-                  onClick={() => simulateLogin(u.id)}
-                  className="w-full text-left p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between transition-all cursor-pointer"
-                >
-                  <div>
-                    <span className="block font-bold text-xs text-slate-800">{u.nombre}</span>
-                    <span className="text-[10px] text-slate-400 font-mono capitalize">{u.rol} • {u.correo}</span>
-                  </div>
-                  <span className="text-xs bg-white border px-2 py-0.5 rounded font-bold font-mono text-slate-600">
-                    Ingresar
-                  </span>
-                </button>
-              ))}
+            <div className="pt-2 space-y-4">
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center gap-3 bg-slate-900 hover:bg-slate-800 text-white font-bold p-3.5 rounded-xl shadow-xs transition-all cursor-pointer text-sm"
+              >
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Acceder con Google Auth</span>
+              </button>
+
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-[10px] text-slate-400 font-mono mb-2">¿Ventanas emergentes de Google bloqueadas en iFrame?</p>
+                <div className="flex gap-2 justify-center">
+                  {usuarios.slice(0, 3).map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => simulateLogin(u.id)}
+                      className="text-[10px] px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-mono font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Demo {u.rol}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -652,6 +696,7 @@ export default function App() {
                         selectedWeek={selectedWeek}
                         setSelectedWeek={setSelectedWeek}
                         readOnly={openProyectoReadOnly}
+                        challenge={activeChallenge}
                       />
                     ) : (
                       <TasteLabSostenibilidad

@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload } from 'lucide-react';
-import { SemanalLog } from '../types';
+import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
+import { SemanalLog, Challenge } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 
 interface BitacoraControlProps {
@@ -14,6 +15,7 @@ interface BitacoraControlProps {
   selectedWeek: number;
   setSelectedWeek: (week: number) => void;
   readOnly?: boolean;
+  challenge?: Challenge;
 }
 
 export const BitacoraControl: React.FC<BitacoraControlProps> = ({
@@ -22,11 +24,25 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
   selectedWeek,
   setSelectedWeek,
   readOnly = false,
+  challenge,
 }) => {
   const currentLog = semanas[selectedWeek];
-  
+
+  const chartData = Object.entries(semanas)
+    .map(([weekStr, logVal]) => {
+      const log = logVal as SemanalLog;
+      const wNum = parseInt(weekStr, 10);
+      return {
+        semana: `Sem ${wNum}`,
+        ph: typeof log?.ph === 'number' ? log.ph : null,
+        completado: log?.completado
+      };
+    })
+    .sort((a, b) => parseInt(a.semana.replace('Sem ', '')) - parseInt(b.semana.replace('Sem ', '')));
+
   // Local transient states
   const [localPh, setLocalPh] = useState<number>(currentLog?.ph ?? 5.5);
+  const isUnsafePh = localPh > 5.0;
   const [localNotas, setLocalNotas] = useState<string>(currentLog?.notas ?? '');
   const [localFotos, setLocalFotos] = useState<string[]>(currentLog?.fotos ?? []);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
@@ -180,6 +196,53 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
         </div>
       </div>
 
+      {/* Evolución Histórica de pH Recharts Graph */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span>📈 Evolución Histórica del pH</span>
+              <span className="text-[10px] font-mono uppercase bg-slate-200 text-slate-800 px-2 py-0.5 rounded-sm">Tendencia Semanal</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Curva de acidificación biológica frente al umbral bactericida seguro (&lt; 4.5).
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] font-mono text-slate-600">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block" /> pH Lote</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-red-500 inline-block" /> Crítico 4.5</span>
+          </div>
+        </div>
+
+        <div className="w-full h-56 pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 10, right: 15, left: -15, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="semana" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+              <YAxis domain={[3, 7]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                formatter={(value: any) => [typeof value === 'number' ? `${value.toFixed(1)} pH` : 'N/A', 'Nivel de pH']}
+              />
+              <ReferenceLine y={4.5} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'insideTopRight', value: 'Límite Crítico (4.5)', fill: '#ef4444', fontSize: 10 }} />
+              {challenge?.phFinalEsperado && (
+                <ReferenceLine y={challenge.phFinalEsperado} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'insideBottomRight', value: `Meta (${challenge.phFinalEsperado})`, fill: '#10b981', fontSize: 10 }} />
+              )}
+              <Line
+                type="monotone"
+                dataKey="ph"
+                name="pH"
+                stroke="#0f172a"
+                strokeWidth={3}
+                connectNulls
+                dot={{ r: 4, fill: '#0f172a', stroke: '#ffffff', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#0f172a', stroke: '#38bdf8', strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Active Week Form Controls */}
       <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-5 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -205,15 +268,40 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
           </div>
         </div>
 
-        {/* pH Range Slider */}
+        {/* pH Range Slider & Validation Highlight */}
         <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <label htmlFor="input-ph-range" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Medición de pH de la Pasta
-            </label>
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1 rounded-md font-mono font-bold text-base text-slate-900 shadow-2xs">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase">pH:</span>
-              <span id="valor-ph-actual">{localPh.toFixed(1)}</span>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <div>
+              <label htmlFor="input-ph-range" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Medición de pH de la Pasta
+              </label>
+              {isUnsafePh && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 animate-pulse mt-0.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Valor fuera del rango seguro (&gt; 5.0)
+                </span>
+              )}
+            </div>
+            
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono font-bold text-base transition-all ${
+              isUnsafePh
+                ? 'bg-red-50 border-2 border-red-500 text-red-900 shadow-xs ring-2 ring-red-200'
+                : 'bg-white border border-slate-200 text-slate-900 shadow-2xs'
+            }`}>
+              <span className={`text-[10px] font-semibold uppercase ${isUnsafePh ? 'text-red-700 font-extrabold' : 'text-slate-400'}`}>pH:</span>
+              <input
+                id="valor-ph-actual"
+                type="number"
+                min="3.0"
+                max="7.0"
+                step="0.1"
+                value={localPh}
+                disabled={readOnly}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (!isNaN(val)) setLocalPh(val);
+                }}
+                className="w-16 bg-transparent text-right font-mono font-bold focus:outline-hidden"
+              />
             </div>
           </div>
 
@@ -227,18 +315,29 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
               value={localPh}
               disabled={readOnly}
               onChange={(e) => setLocalPh(parseFloat(e.target.value))}
-              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900 focus:outline-hidden disabled:opacity-50"
+              className={`w-full h-2 rounded-lg appearance-none cursor-pointer focus:outline-hidden disabled:opacity-50 transition-colors ${
+                isUnsafePh ? 'bg-red-200 accent-red-600' : 'bg-slate-200 accent-slate-900'
+              }`}
             />
             {/* Range markers */}
             <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2 px-1">
               <span>3.0 (Ácido)</span>
               <span>4.0</span>
-              <span>4.5 (Punto Crítico)</span>
-              <span>5.0</span>
+              <span className={isUnsafePh ? 'text-red-600 font-bold' : ''}>4.5 (Punto Crítico)</span>
+              <span className={isUnsafePh ? 'text-red-600 font-bold underline' : ''}>5.0 (Umbral Seguro)</span>
               <span>6.0</span>
               <span>7.0 (Neutro)</span>
             </div>
           </div>
+
+          {isUnsafePh && (
+            <div className="p-3 bg-red-100/80 border border-red-300 rounded-xl text-xs text-red-900 font-sans flex items-start gap-2 shadow-2xs animate-pulse">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+              <div>
+                <strong className="font-bold">¡ALERTA DE SEGURIDAD CRÍTICA!</strong> El valor de pH ({localPh.toFixed(1)}) supera el límite seguro (&gt; 5.0). A este nivel de acidez no se inhiben bacterias patógenas ni mohos indeseados. Calibra el pehachímetro o descarta la muestra.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Asynchronous Alert Box */}
