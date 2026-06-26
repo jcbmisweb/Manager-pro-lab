@@ -18,6 +18,8 @@ import { ChatMessenger } from './components/ChatMessenger';
 import { ReportViewer } from './components/ReportViewer';
 import { compressImage } from './utils/imageCompressor';
 import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
+import { db } from './firebase';
+import { collection, getDocs, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 
 import {
   Sliders,
@@ -287,6 +289,60 @@ export default function App() {
     setIesConfig(prev => ({ ...prev, nombre }));
   };
 
+  // VI. SYSTEM RESET (ADMIN ONLY)
+  const handleSystemReset = async () => {
+    // Strictly guard for the main admin email
+    const mainAdminEmail = 'juan.codina@murciaeduca.es';
+    if (user?.email?.toLowerCase().trim() !== mainAdminEmail) {
+      alert("Operación no permitida. Solo el administrador principal puede realizar esta acción.");
+      return;
+    }
+
+    const confirm1 = window.confirm("⚠️ ATENCIÓN: Estás a punto de borrar TODOS los datos de la aplicación (alumnos, proyectos, aulas, configuraciones) tanto localmente como en la base de datos Firestore. Esto es irreversible. ¿Deseas continuar?");
+    if (!confirm1) return;
+
+    const confirm2 = window.prompt("Para confirmar el borrado total de la aplicación y empezar de cero el nuevo curso, escribe 'BORRAR TODO' en mayúsculas:");
+    if (confirm2 !== 'BORRAR TODO') {
+      alert("Confirmación fallida. No se ha borrado nada.");
+      return;
+    }
+
+    try {
+      // 1. Clear LocalStorage
+      const keysToClear = [
+        'mpl_user_session', 
+        'mpl_ies_config', 
+        'mpl_aulas', 
+        'mpl_usuarios', 
+        'mpl_proyectos_all',
+        'mpl_clases',
+        'mpl_usuarios_global',
+        'mpl_mensajes_chat'
+      ];
+      keysToClear.forEach(k => localStorage.removeItem(k));
+
+      // 2. Clear Firestore Collections (Attempt)
+      const collectionsToClear = ['usuarios', 'aulas', 'proyectos', 'bitacora', 'mensajes'];
+      for (const colName of collectionsToClear) {
+        const querySnapshot = await getDocs(collection(db, colName));
+        if (!querySnapshot.empty) {
+          const batch = writeBatch(db);
+          querySnapshot.forEach((document) => {
+            batch.delete(doc(db, colName, document.id));
+          });
+          await batch.commit();
+        }
+      }
+
+      alert("Sistema reseteado correctamente en local y base de datos. La aplicación se reiniciará con los valores de fábrica.");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error durante el reseteo del sistema:", error);
+      alert("Se produjo un error al intentar borrar algunos datos de la base de datos (Firestore). Es posible que necesites revisar los permisos. Sin embargo, los datos locales han sido limpiados.");
+      window.location.reload();
+    }
+  };
+
   const handleIESLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -300,8 +356,17 @@ export default function App() {
   };
 
   // User Administration
-  const promoteToTeacher = (userId: string) => {
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, rol: 'profesor', aulaId: undefined } : u));
+  const changeUserRole = (userId: string, rol: 'admin' | 'profesor' | 'alumno') => {
+    const userToChange = usuarios.find(u => u.id === userId);
+    if (userToChange?.correo === 'juan.codina@murciaeduca.es' && rol !== 'admin') {
+      alert('No se puede cambiar el rol del administrador principal.');
+      return;
+    }
+    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, rol, aulaId: rol !== 'alumno' ? undefined : u.aulaId } : u));
+    // If we changed current logged in user role
+    if (user && user.id === userId) {
+      setUser(prev => prev ? { ...prev, role: rol } : null);
+    }
   };
 
   const changeUserStatus = (userId: string, estado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado') => {
@@ -868,6 +933,28 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
+
+                            {/* DANGER ZONE: SYSTEM RESET */}
+                            <div className="md:col-span-2 mt-4 pt-6 border-t border-rose-100">
+                              <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div>
+                                  <h4 className="text-xs font-black text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Trash2 className="w-4 h-4" />
+                                    Zona de Peligro: Reinicio de Curso
+                                  </h4>
+                                  <p className="text-[10px] text-rose-600 mt-1 max-w-md">
+                                    Esta acción eliminará permanentemente todos los alumnos, aulas, proyectos y configuraciones. 
+                                    Úsala solo al finalizar el año escolar para preparar el sistema para el siguiente curso.
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={handleSystemReset}
+                                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg shadow-sm transition-colors cursor-pointer whitespace-nowrap"
+                                >
+                                  Resetear todo el Sistema
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -954,7 +1041,15 @@ export default function App() {
                                     <td className="py-3 font-bold text-slate-800">{u.nombre}</td>
                                     <td className="py-3 font-mono text-slate-500">{u.correo}</td>
                                     <td className="py-3">
-                                      <span className="capitalize font-semibold text-slate-700">{u.rol}</span>
+                                      <select
+                                        value={u.rol}
+                                        onChange={(e: any) => changeUserRole(u.id, e.target.value)}
+                                        className="text-[10px] p-1 bg-white border rounded text-slate-700 font-bold uppercase cursor-pointer"
+                                      >
+                                        <option value="admin">Admin</option>
+                                        <option value="profesor">Profesor</option>
+                                        <option value="alumno">Alumno</option>
+                                      </select>
                                     </td>
                                     <td className="py-3">
                                       {u.rol === 'alumno' ? (
@@ -986,15 +1081,6 @@ export default function App() {
                                       </span>
                                     </td>
                                     <td className="py-3 text-right flex items-center justify-end gap-1.5">
-                                      {u.rol === 'alumno' && (
-                                        <button
-                                          onClick={() => promoteToTeacher(u.id)}
-                                          title="Promover a Profesor"
-                                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded transition-colors cursor-pointer"
-                                        >
-                                          <ShieldAlert className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
                                       <select
                                         value={u.estado}
                                         onChange={(e: any) => changeUserStatus(u.id, e.target.value)}
