@@ -205,18 +205,48 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Asignar rol basado en email oficial o coincidencia en lista local
         const userEmail = (firebaseUser.email || '').toLowerCase().trim();
-        const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
-        const isProf = userEmail.includes('prof');
 
-        setUser({
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Usuario Google',
-          email: userEmail,
-          role: isAdmin ? 'admin' : (isProf ? 'profesor' : 'alumno'),
-          loggedIn: true,
-          estado: 'activo'
+        setUsuarios(prev => {
+          const existingUser = prev.find(u => u.id === firebaseUser.uid || u.correo === userEmail);
+          let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
+          let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
+          let nextUsers = prev;
+
+          if (!existingUser) {
+            // New user, assign default role
+            const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
+            const isProf = userEmail.includes('prof');
+            currentUserRole = isAdmin ? 'admin' : (isProf ? 'profesor' : 'alumno');
+            
+            const newUser: Usuario = {
+              id: firebaseUser.uid,
+              nombre: firebaseUser.displayName || 'Usuario Google',
+              correo: userEmail,
+              rol: currentUserRole,
+              estado: 'activo'
+            };
+            nextUsers = [...prev, newUser];
+          } else {
+            // Existing user, keep their role and state
+            currentUserRole = existingUser.rol;
+            currentUserEstado = existingUser.estado || 'activo';
+            // Update their ID if they are logging in for the first time with an email that was pre-registered
+            if (existingUser.id !== firebaseUser.uid) {
+               nextUsers = prev.map(u => u.correo === userEmail ? { ...u, id: firebaseUser.uid } : u);
+            }
+          }
+
+          setUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || existingUser?.nombre || 'Usuario Google',
+            email: userEmail,
+            role: currentUserRole,
+            loggedIn: true,
+            estado: currentUserEstado
+          });
+
+          return nextUsers;
         });
       } else {
         setUser(null);
