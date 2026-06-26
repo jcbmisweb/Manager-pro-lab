@@ -203,17 +203,20 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        // Asignar rol basado en email oficial o coincidencia en lista local
+        const userEmail = (firebaseUser.email || '').toLowerCase().trim();
+        const isAdmin = userEmail === 'juan.codina@murciaeduca.es' || userEmail === 'jcbmisweb@gmail.com' || userEmail.includes('admin');
+        const isProf = userEmail.includes('prof');
+
         setUser({
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Usuario Google',
-          email: firebaseUser.email || '',
-          role: firebaseUser.email?.includes('admin') ? 'admin' : (firebaseUser.email?.includes('prof') ? 'profesor' : 'estudiante'),
+          email: userEmail,
+          role: isAdmin ? 'admin' : (isProf ? 'profesor' : 'alumno'),
           loggedIn: true,
           estado: 'activo'
         });
       } else {
-        // Solo limpiamos si no hay sesión simulada previa que queramos mantener (opcional)
-        // Pero para Google Auth, si onAuthStateChanged dice null, es que no hay sesión activa.
         setUser(null);
       }
       setIsLoading(false);
@@ -244,29 +247,6 @@ export default function App() {
   // ----------------------------------------------------
   // IV. CORE SYSTEM OPERATIONS (HANDLERS)
   // ----------------------------------------------------
-
-  // Simulate logging as any specific user
-  const simulateLogin = (userId: string) => {
-    const targetUser = usuarios.find(u => u.id === userId);
-    if (targetUser) {
-      if (targetUser.estado === 'bloqueado' || targetUser.estado === 'suspendido') {
-        alert(`No se puede iniciar sesión. Este usuario está ${targetUser.estado.toUpperCase()}.`);
-        return;
-      }
-      setUser({
-        id: targetUser.id,
-        name: targetUser.nombre,
-        email: targetUser.correo,
-        role: targetUser.rol,
-        loggedIn: true,
-        estado: targetUser.estado,
-        aulaId: targetUser.aulaId
-      });
-      // Close any active laboratory workspace
-      setOpenProyectoId(null);
-      setOpenProyectoReadOnly(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -325,12 +305,30 @@ export default function App() {
   };
 
   const changeUserStatus = (userId: string, estado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado') => {
+    const userToChange = usuarios.find(u => u.id === userId);
+    if (userToChange?.correo === 'juan.codina@murciaeduca.es' && estado !== 'activo') {
+      alert('No se puede cambiar el estado a inactivo para el administrador principal.');
+      return;
+    }
     setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, estado } : u));
     // If we changed current logged in user status
     if (user && user.id === userId) {
       if (estado !== 'activo') {
-        setUser(null);
-        setOpenProyectoId(null);
+        handleLogout();
+      }
+    }
+  };
+
+  const deleteUser = (userId: string) => {
+    const userToDelete = usuarios.find(u => u.id === userId);
+    if (userToDelete?.correo === 'juan.codina@murciaeduca.es') {
+      alert('No se puede eliminar al administrador principal.');
+      return;
+    }
+    if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente a este usuario?')) {
+      setUsuarios(prev => prev.filter(u => u.id !== userId));
+      if (user && user.id === userId) {
+        handleLogout();
       }
     }
   };
@@ -614,35 +612,8 @@ export default function App() {
                 >
                   <span>Usar modo Redirección (Recomendado)</span>
                 </button>
-
-                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-2 text-left">
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
-                    <strong>¡Atención!</strong> Si el login falla, asegúrate de añadir estos dominios en Firebase Console (Authentication &gt; Settings):
-                  </p>
-                  <ul className="text-[10px] text-amber-700 mt-1 list-disc list-inside font-mono">
-                    <li>managerprolab.vercel.app</li>
-                    <li>{window.location.hostname}</li>
-                  </ul>
-                  <p className="text-[10px] text-amber-600 mt-1 italic">
-                    * Sin https:// ni barras finales.
-                  </p>
-                </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-[10px] text-slate-400 font-mono mb-2">¿Ventanas emergentes de Google bloqueadas en iFrame?</p>
-                <div className="flex gap-2 justify-center">
-                  {usuarios.slice(0, 3).map(u => (
-                    <button
-                      key={u.id}
-                      onClick={() => simulateLogin(u.id)}
-                      className="text-[10px] px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-mono font-bold rounded-lg transition-colors cursor-pointer"
-                    >
-                      Demo {u.rol}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         ) : (
@@ -1007,18 +978,21 @@ export default function App() {
                                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                                           : u.estado === 'bloqueado'
                                           ? 'bg-red-50 text-red-700 border border-red-100'
+                                          : u.estado === 'eliminado'
+                                          ? 'bg-slate-100 text-slate-500 border border-slate-200'
                                           : 'bg-amber-50 text-amber-700 border border-amber-100'
                                       }`}>
                                         {u.estado}
                                       </span>
                                     </td>
-                                    <td className="py-3 text-right space-x-1">
+                                    <td className="py-3 text-right flex items-center justify-end gap-1.5">
                                       {u.rol === 'alumno' && (
                                         <button
                                           onClick={() => promoteToTeacher(u.id)}
-                                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold uppercase rounded cursor-pointer"
+                                          title="Promover a Profesor"
+                                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded transition-colors cursor-pointer"
                                         >
-                                          Promover a Profesor
+                                          <ShieldAlert className="w-3.5 h-3.5" />
                                         </button>
                                       )}
                                       <select
@@ -1027,9 +1001,17 @@ export default function App() {
                                         className="text-[10px] p-1 bg-white border rounded text-slate-700 font-bold uppercase cursor-pointer"
                                       >
                                         <option value="activo">Activo</option>
-                                        <option value="bloqueado">Bloquear</option>
-                                        <option value="suspendido">Suspender</option>
+                                        <option value="bloqueado">Bloqueado</option>
+                                        <option value="suspendido">Suspendido</option>
+                                        <option value="eliminado">Eliminado</option>
                                       </select>
+                                      <button
+                                        onClick={() => deleteUser(u.id)}
+                                        title="Eliminar permanentemente"
+                                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded transition-colors cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
                                     </td>
                                   </tr>
                                 ))}
@@ -1427,27 +1409,9 @@ export default function App() {
 
       </main>
 
-      {/* 3. SIMULATED TESTING ROLE SELECTOR BAR (Requirement 1) */}
+      {/* 3. FOOTER */}
       <footer className="mt-12 bg-slate-900 border-t border-slate-800 py-6 text-white text-center">
         <div className="max-w-7xl mx-auto px-4 space-y-4">
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-slate-800 border border-slate-700 rounded-2xl p-2 max-w-2xl mx-auto shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono px-2">
-              🔧 Simulador de Usuarios:
-            </span>
-            {usuarios.filter(u => u.estado !== 'eliminado').map(u => (
-              <button
-                key={u.id}
-                onClick={() => simulateLogin(u.id)}
-                className={`text-[10px] px-2.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                  user && user.id === u.id
-                    ? 'bg-emerald-500 text-white shadow-xs'
-                    : 'bg-slate-900 text-slate-400 hover:text-white'
-                }`}
-              >
-                {u.nombre} ({u.rol})
-              </button>
-            ))}
-          </div>
           <p className="text-[10px] text-slate-500 font-mono">
             &copy; {new Date().getFullYear()} {iesConfig.nombre} • Todos los derechos reservados • Desarrollado con tecnología de micro-compresión de imágenes.
           </p>
