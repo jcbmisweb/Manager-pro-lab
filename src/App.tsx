@@ -359,6 +359,9 @@ export default function App() {
       
       if (error.code === 'auth/popup-blocked') {
         alert("El navegador bloqueó la ventana emergente. Por favor, permite las popups para este sitio o intenta de nuevo.");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // El usuario cerró la ventana intencionalmente, no hacer nada
+        console.log("Login cancelado por el usuario.");
       } else if (error.code === 'auth/unauthorized-domain') {
         const currentDomain = window.location.hostname;
         alert(`Error: El dominio '${currentDomain}' no está autorizado en tu consola de Firebase. Debes añadirlo en Authentication > Settings > Authorized Domains.`);
