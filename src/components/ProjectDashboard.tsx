@@ -28,7 +28,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ challenges, 
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard de Proyectos</h1>
       {blocks.map(block => {
-        const blockChallenges = visibleChallenges.filter(c => c.bloque === block);
+        const blockChallenges = visibleChallenges.filter(c => (c.bloque || 'A') === block);
         if (studentMode && blockChallenges.length === 0) return null;
         
         return (
