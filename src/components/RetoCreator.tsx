@@ -64,7 +64,67 @@ ESQUEMA JSON REQUERIDO:
 REGLAS CRÍTICAS:
 1. La propiedad "bloque" debe ser estrictamente "A", "B" o "C".
 2. Asegúrate de generar IDs únicos para ingredientes y pasos ("ing1", "ing2", "p1", "p2", etc.).
-3. Devuelve únicamente el objeto JSON puro y válido. No añadas introducciones, explicaciones, ni marcas de código como \`\`\`json.`;
+3. Devuelve únicamente el objeto JSON puro y válido. No añadas introducciones, explicaciones, ni marcas de código como \`\`\`json.
+4. MUY IMPORTANTE: Si usas comillas dentro de los textos (ej. nombres de marcas como "residuo cero", etc.), utiliza comillas simples (') en su lugar (ej. 'residuo cero') o escápalas con barra invertida (\\\"). NUNCA uses comillas dobles sin escapar dentro de un texto entre comillas dobles, ya que rompería la estructura del JSON.`;
+
+function tryRepairAndCleanJson(badJson: string): string {
+  let cleaned = badJson.trim();
+
+  // Remove cite annotations if any
+  cleaned = cleaned.replace(/\[cite\]/g, '').replace(/\[cite_start\]/g, '');
+
+  // Extract JSON from markdown code blocks if present
+  const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/) || cleaned.match(/```\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[1].trim();
+  } else {
+    // Just strip backticks at the start/end if they didn't wrap properly
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+  }
+
+  cleaned = cleaned.trim();
+
+  // Strip leading and trailing parenthesis/brackets if wrapped like ({ ... }) or ( { ... } )
+  if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+  }
+
+  // Split into lines to repair unescaped double quotes inside values line-by-line
+  const lines = cleaned.split('\n');
+  const repairedLines = lines.map(line => {
+    // Matches leading spaces, a double-quoted key, optional spaces, colon, optional spaces, open double quote,
+    // then the middle part of the value, then ending double quote, optional comma, optional trailing spaces/newlines.
+    const match = line.match(/^(\s*"[^"]+"\s*:\s*")([\s\S]*)("\s*,?\s*)$/);
+    if (match) {
+      const prefix = match[1];
+      const middle = match[2];
+      const suffix = match[3];
+
+      let repairedMiddle = '';
+      for (let i = 0; i < middle.length; i++) {
+        if (middle[i] === '"') {
+          // Check if this double quote is escaped by a backslash
+          if (i > 0 && middle[i - 1] === '\\') {
+            repairedMiddle += '"'; // Keep as \"
+          } else {
+            repairedMiddle += "'"; // Convert unescaped " into ' to prevent JSON parsing crash
+          }
+        } else {
+          repairedMiddle += middle[i];
+        }
+      }
+      return prefix + repairedMiddle + suffix;
+    }
+    return line;
+  });
+
+  cleaned = repairedLines.join('\n');
+
+  // Remove trailing commas before closing braces/brackets on newlines
+  cleaned = cleaned.replace(/,\s*\n\s*([}\]])/g, '\n$1');
+
+  return cleaned;
+}
 
 export function RetoCreator() {
   const [jsonText, setJsonText] = useState('');
@@ -102,18 +162,7 @@ export function RetoCreator() {
   };
 
   const publicarNuevoReto = async () => {
-    let cleanJson = jsonText.trim();
-    // Remove cite annotations if any
-    cleanJson = cleanJson.replace(/\[cite\]/g, '').replace(/\[cite_start\]/g, '');
-    
-    // Extract JSON from markdown code blocks if present
-    const jsonMatch = cleanJson.match(/```json\s*([\s\S]*?)\s*```/) || cleanJson.match(/```\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      cleanJson = jsonMatch[1].trim();
-    } else {
-      // Just strip backticks at the start/end if they didn't wrap properly
-      cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
+    const cleanJson = tryRepairAndCleanJson(jsonText);
 
     if (!cleanJson) {
       alert("Por favor, introduce primero el texto estructurado (JSON) que te dio la IA.");
@@ -243,7 +292,8 @@ export function RetoCreator() {
           </p>
           
           <textarea 
-            className="w-full h-60 bg-white border border-emerald-500 rounded-2xl p-4 text-sm font-mono focus:ring-2 focus:ring-emerald-200 outline-none"
+            className="w-full h-60 bg-white border border-emerald-500 rounded-2xl p-4 text-sm font-mono text-slate-900 focus:ring-2 focus:ring-emerald-200 outline-none"
+            style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}
             placeholder="Pega el código JSON aquí..."
