@@ -22,7 +22,7 @@ interface ChatThread {
   targetAula?: Aula;
 }
 
-export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatMessengerProps) {
+export function ChatMessenger({ currentUser, usuarios = [], aulas = [], proyectos = [] }: ChatMessengerProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [activeTab, setActiveTab] = useState<'chats' | 'contactos'>('chats');
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,7 +37,7 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
   useEffect(() => {
     const q = query(collection(db, "mensajes"), orderBy("fecha", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      setMensajes(snap.docs.map(doc => doc.data() as Mensaje));
+      setMensajes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mensaje)));
     }, err => console.warn("ChatMessenger snaps err:", err));
     return () => unsub();
   }, []);

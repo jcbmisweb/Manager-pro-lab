@@ -139,7 +139,7 @@ export function RetoCreator() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'ManagerproLab'), (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), type: 'dinamico', expanded: false } as any));
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'dinamico', expanded: false } as any));
       setAllProjects(fetched);
     });
     return () => unsub();

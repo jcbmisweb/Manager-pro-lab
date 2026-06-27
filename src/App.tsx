@@ -99,7 +99,10 @@ export default function App() {
   const [aulas, setAulas] = useState<Aula[]>(() => {
     try {
       const saved = localStorage.getItem('mpl_aulas');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {}
     return [
       { id: 'aula-1', nombre: '2º Cocina y Gastronomía - Sección A', profesorId: 'u-prof-1' },
@@ -111,7 +114,10 @@ export default function App() {
   const [usuarios, setUsuarios] = useState<Usuario[]>(() => {
     try {
       const saved = localStorage.getItem('mpl_usuarios');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {}
     return [
       { id: 'u-admin-1', nombre: 'Juan Codina', correo: 'juan.codina@murciaeduca.es', rol: 'admin', estado: 'activo' },
@@ -130,7 +136,10 @@ export default function App() {
   const [proyectos, setProyectos] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem('mpl_proyectos_all');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {}
     // Seed an initial project for student 1 (Ana Gómez Ortiz) to inspect immediately
     const initialSemanas: Record<number, SemanalLog> = {};
@@ -281,22 +290,22 @@ export default function App() {
     runMigration().then(() => {
       // Configurar listeners en tiempo real para las colecciones DESPUÉS de migrar
       const u1 = onSnapshot(collection(db, "usuarios"), (snapshot) => {
-        setUsuarios(snapshot.docs.map(doc => doc.data() as Usuario));
+        setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Usuario)));
       }, (err) => console.warn("usuarios listener error:", err));
       const u2 = onSnapshot(collection(db, "aulas"), (snapshot) => {
-        setAulas(snapshot.docs.map(doc => doc.data() as Aula));
+        setAulas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Aula)));
       }, (err) => console.warn("aulas listener error:", err));
       const u3 = onSnapshot(collection(db, "proyectos"), (snapshot) => {
-        setProyectos(snapshot.docs.map(doc => doc.data() as Challenge));
+        setProyectos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
       }, (err) => console.warn("proyectos listener error:", err));
       const u4 = onSnapshot(collection(db, "mensajes"), (snapshot) => {
-        setMensajes(snapshot.docs.map(doc => doc.data() as any));
+        setMensajes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
       }, (err) => console.warn("mensajes listener error:", err));
       
       const u5 = onSnapshot(collection(db, "ManagerproLab"), (snapshot) => {
         if (!snapshot.empty) {
           // Sort them by code or id so they appear in order
-          const fetchedChallenges = snapshot.docs.map(doc => doc.data() as Challenge);
+          const fetchedChallenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Challenge));
           fetchedChallenges.sort((a, b) => {
             const idA = a?.id || '';
             const idB = b?.id || '';
@@ -774,19 +783,20 @@ export default function App() {
   // ----------------------------------------------------
   // V. COMPUTED VIEWS HELPERS
   // ----------------------------------------------------
-  const activeProject = proyectos.find(p => p.id === openProyectoId);
-  const activeChallenge = activeProject ? challengesState.find(c => c.id === activeProject.challengeId) : null;
+  const activeProject = Array.isArray(proyectos) ? proyectos.find(p => p && p.id === openProyectoId) : null;
+  const activeChallenge = (activeProject && Array.isArray(challengesState)) ? challengesState.find(c => c && c.id === activeProject.challengeId) : null;
 
   // Find conversations and unread counts for messenger alert
-  const unreadMessagesCount = user ? 
+  const unreadMessagesCount = (user && Array.isArray(mensajes)) ? 
     mensajes.filter((m: any) => {
+      if (!m) return false;
       if (m.tipo === 'grupal') {
         if (m.emisorId === user.id) return false;
         let hasAccess = false;
         if (user.role === 'alumno') {
           hasAccess = m.aulaId === user.aulaId;
         } else if (user.role === 'profesor') {
-          hasAccess = aulas.some(a => a.id === m.aulaId && a.profesorId === user.id);
+          hasAccess = Array.isArray(aulas) && aulas.some(a => a && a.id === m.aulaId && a.profesorId === user.id);
         } else if (user.role === 'admin') {
           hasAccess = true;
         }
