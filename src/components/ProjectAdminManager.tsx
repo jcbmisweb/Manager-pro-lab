@@ -42,6 +42,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 value={editedChallenge.name || ''}
                 onChange={e => setEditedChallenge({...editedChallenge, name: e.target.value})}
                 placeholder="Nombre del proyecto"
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
                 className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none text-slate-900 bg-white font-medium"
               />
             </div>
@@ -56,6 +57,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 value={editedChallenge.code || ''}
                 onChange={e => setEditedChallenge({...editedChallenge, code: e.target.value})}
                 placeholder="PROY-01"
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
                 className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none font-mono text-slate-900 bg-white font-medium"
               />
             </div>
@@ -66,7 +68,8 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
               <select 
                 value={editedChallenge.bloque || 'A'}
                 onChange={e => setEditedChallenge({...editedChallenge, bloque: e.target.value as 'A' | 'B' | 'C'})}
-                className="w-full text-sm p-2 bg-indigo-50 border border-indigo-200 text-indigo-950 font-bold rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow outline-none text-slate-900"
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
+                className="w-full text-sm p-2 bg-indigo-50 border border-indigo-200 font-bold rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow outline-none text-slate-900"
               >
                 <option value="A">Bloque A</option>
                 <option value="B">Bloque B</option>
@@ -83,6 +86,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 onChange={e => setEditedChallenge({...editedChallenge, emoji: e.target.value})}
                 placeholder="🔬"
                 maxLength={4}
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
                 className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-center outline-none text-slate-900 bg-white font-medium"
               />
             </div>
@@ -101,6 +105,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 value={editedChallenge.infographicUrl || ''}
                 onChange={e => setEditedChallenge({...editedChallenge, infographicUrl: e.target.value})}
                 placeholder="https://drive.google.com/..."
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
                 className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 bg-white font-medium"
               />
             </div>
@@ -113,6 +118,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 value={editedChallenge.pdfUrl || ''}
                 onChange={e => setEditedChallenge({...editedChallenge, pdfUrl: e.target.value})}
                 placeholder="https://drive.google.com/..."
+                style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
                 className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 bg-white font-medium"
               />
             </div>
@@ -128,6 +134,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
             <textarea 
               value={editedChallenge.sustainableObjective || ''} 
               onChange={e => setEditedChallenge({...editedChallenge, sustainableObjective: e.target.value})}
+              style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
               className="w-full text-sm p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px] text-slate-900 bg-white font-medium outline-none"
             />
           </div>
@@ -137,6 +144,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
             <textarea 
               value={editedChallenge.investigationVariable || ''} 
               onChange={e => setEditedChallenge({...editedChallenge, investigationVariable: e.target.value})}
+              style={{ colorScheme: 'light', color: '#0f172a', backgroundColor: '#ffffff' }}
               className="w-full text-sm p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px] text-slate-900 bg-white font-medium outline-none"
             />
           </div>
@@ -157,6 +165,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                     newInsumos[idx].titulo = e.target.value;
                     setEditedChallenge({...editedChallenge, insumosBase: newInsumos});
                   }}
+                  style={{ colorScheme: 'light', color: '#0f172a' }}
                   className="font-bold text-slate-800 bg-transparent border-b border-slate-300 focus:border-blue-500 outline-none px-1 py-0.5 w-full"
                 />
                 
@@ -210,6 +219,7 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                     elaboracionPrincipal: { ...editedChallenge.elaboracionPrincipal!, titulo: e.target.value }
                   });
                 }}
+                style={{ colorScheme: 'light', color: '#0f172a' }}
                 className="font-bold text-slate-800 bg-transparent border-b border-slate-300 focus:border-blue-500 outline-none px-1 py-0.5 w-full"
               />
               

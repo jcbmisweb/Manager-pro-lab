@@ -5,20 +5,66 @@ import { db } from '../firebase';
 import { doc, setDoc, deleteDoc, onSnapshot, collection, updateDoc } from 'firebase/firestore';
 import { ProjectAdminManager } from './ProjectAdminManager';
 
-const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Eco-Lab'. El JSON debe tener la siguiente estructura:
+const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios de bioprocesos alimentarios y cocina sostenible. Tu tarea es analizar y extraer detalladamente la información de la receta o documento de laboratorio proporcionado, y convertirla a un formato JSON estrictamente estructurado según el siguiente esquema exacto para la aplicación.
+
+ESQUEMA JSON REQUERIDO:
 {
-  "id": "reto-01",
-  "code": "Reto 01-B",
-  "name": "Título del reto",
-  "descripcion": "Descripción breve del proyecto",
-  "emoji": "🔬",
-  "bloque": "A",
+  "id": "reto-[nombre-abreviado-unico]",
+  "code": "RETO [Número] o [Código del Proyecto]",
+  "name": "Nombre completo del Reto / Proyecto",
+  "emoji": "🧀 o un emoji representativo del proyecto",
+  "gradient": "from-amber-500 to-orange-600 (elige colores adecuados según el proyecto)",
+  "description": "Descripción resumida y atractiva de los objetivos ecológicos y gastronómicos",
+  "scientificObjective": "Objetivo científico (ej. Acidificación controlada, reticulación polimérica, etc.)",
+  "sustainableObjective": "Objetivo de sostenibilidad y economía circular (ej. Valorización de residuos, alternativa vegetal)",
+  "investigationVariable": "Variable de investigación a comparar (ej. Kéfir casero vs probióticos comerciales, concentración de espesante)",
+  "initialWeightDefault": 400, // número representativo del peso inicial en gramos
+  "inoculantOptions": ["Iniciador Opción A", "Iniciador Opción B"], // opciones de inóculo o fermento
+  "materiaPrimaLabel": "Nombre del ingrediente base principal",
+  "precioMateriaPrimaKilo": 12.5, // coste estimado por kg del ingrediente base
+  "precioComercialKilo": 28.5, // precio comercial estimado del producto terminado por kg
+  "semanaMax": 8, // número total de semanas de duración del proyecto
+  "phInicialDefault": 6.0, // pH de inicio estimado
+  "phFinalEsperado": 4.4, // pH final deseado
+  "bloque": "A", // Debe ser exactamente "A", "B" o "C" (A: Lácteos Veganos y Proteína Alternativa, B: Bebidas Probióticas y Zero Waste, C: Fermentaciones Vegetales y Condimentos Técnicos)
+  "insumosBase": [
+    {
+      "titulo": "Nombre del Insumo / Fermento Base (ej. Kéfir de Agua (El Iniciador))",
+      "ingredientes": [
+        { "id": "ing1", "nombre": "Nombre del ingrediente", "cantidad": "60g", "notas": "opcional" }
+      ],
+      "pasos": [
+        { "id": "p1", "orden": 1, "descripcion": "Descripción del paso" }
+      ],
+      "mantenimiento": "Instrucciones de conservación o mantenimiento (opcional)"
+    }
+  ],
+  "elaboracionPrincipal": {
+    "titulo": "Nombre del Producto Final (ej. El Queso de Anacardos)",
+    "ingredientes": [
+      { "id": "ep1", "nombre": "Nombre de la materia prima", "cantidad": "400g" }
+    ],
+    "pasos": [
+      { "id": "ep_p1", "orden": 1, "descripcion": "Descripción detallada del paso de montaje o elaboración" }
+    ]
+  },
   "cronograma": [
-    { "semanas": "1-2", "fase": "Fase inicial", "accionAlumno": "Acción a realizar", "puntoCriticoControl": "Control de calidad" }
+    {
+      "id": "cro1",
+      "fase": "Nombre de la fase (ej. Arranque, Maduración, Afinación, Evidencia)",
+      "semanas": "1", // número o rango de semanas (ej: '1', '2', '3-6')
+      "accionAlumno": "Acción detallada que debe realizar el alumno",
+      "puntoCriticoControl": "Punto crítico de control (PCC)",
+      "requiereFoto": true,
+      "parametrosRegistrar": ["pH", "Aspecto", "Olor"] // lista de parámetros a registrar en esta semana
+    }
   ]
 }
-Nota para la propiedad 'bloque': Utiliza "A", "B" o "C" según corresponda. Si no se indica explícitamente, ponle "A" o la categoría que consideres más idónea.
-No incluyas explicaciones adicionales, ni marcas de código como \`\`\`json. Solo el objeto JSON puro.`;
+
+REGLAS CRÍTICAS:
+1. La propiedad "bloque" debe ser estrictamente "A", "B" o "C".
+2. Asegúrate de generar IDs únicos para ingredientes y pasos ("ing1", "ing2", "p1", "p2", etc.).
+3. Devuelve únicamente el objeto JSON puro y válido. No añadas introducciones, explicaciones, ni marcas de código como \`\`\`json.`;
 
 export function RetoCreator() {
   const [jsonText, setJsonText] = useState('');
@@ -57,8 +103,17 @@ export function RetoCreator() {
 
   const publicarNuevoReto = async () => {
     let cleanJson = jsonText.trim();
+    // Remove cite annotations if any
     cleanJson = cleanJson.replace(/\[cite\]/g, '').replace(/\[cite_start\]/g, '');
-    cleanJson = cleanJson.replace(/^```json/, '').replace(/```$/, '');
+    
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = cleanJson.match(/```json\s*([\s\S]*?)\s*```/) || cleanJson.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      cleanJson = jsonMatch[1].trim();
+    } else {
+      // Just strip backticks at the start/end if they didn't wrap properly
+      cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
 
     if (!cleanJson) {
       alert("Por favor, introduce primero el texto estructurado (JSON) que te dio la IA.");
