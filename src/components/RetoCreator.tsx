@@ -216,56 +216,43 @@ export function RetoCreator() {
       </div>
             {/* GESTIÓN DE RETOS */}
       <div className="bg-slate-900 rounded-3xl p-8 border border-slate-800">
-        <h2 className="text-2xl font-bold mb-6">Retos Actuales - Base de datos</h2>
+        <h2 className="text-2xl font-bold mb-6">Gestión de Retos</h2>
         
-        <div className="mb-6">
+        <div className="mb-6 space-y-6">
+          <h3 className="text-lg font-semibold text-slate-300">Retos Actuales - Base de datos</h3>
           <div className="space-y-4">
             {allProjects.map((reto: any) => (
               <div 
                 key={reto.id} 
-                className={`bg-slate-800 rounded-xl border border-slate-700 transition-all overflow-hidden ${expandedId === reto.id ? 'border-emerald-500 ring-1 ring-emerald-500/30' : ''}`}
+                className="bg-slate-800 rounded-xl border border-slate-700 p-4 flex items-center justify-between"
               >
-                <div 
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-700/50"
-                  onClick={() => setExpandedId(expandedId === reto.id ? null : reto.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <Database size={16} className="text-blue-400" title="Proyecto del Sistema" />
-                    <div>
-                      <span className="font-semibold text-slate-100 block">{reto.name || reto.titulo} ({reto.id})</span>
-                      <span className="text-xs text-slate-400 block">{reto.descripcion}</span>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <Database size={16} className="text-blue-400" />
+                  <div>
+                    <span className="font-semibold text-slate-100 block">{reto.name || reto.titulo} ({reto.id})</span>
                   </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                   <label className="flex items-center gap-2 text-sm text-slate-300">
+                     <input 
+                       type="checkbox" 
+                       checked={reto.isPublished || false}
+                       onChange={async (e) => {
+                         const isPublished = e.target.checked;
+                         await updateDoc(doc(db, "ManagerproLab", reto.id), { isPublished });
+                       }}
+                     />
+                     Publicar
+                   </label>
                   <button 
-                    onClick={(e) => { e.stopPropagation(); borrarReto(reto.id, 'dinamico'); }}
+                    onClick={() => { borrarReto(reto.id, 'dinamico'); }}
                     className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                     title="Borrar reto"
                   >
                     <Trash2 size={20} />
                   </button>
                 </div>
-                
-                {/* Vista Expandida */}
-                {expandedId === reto.id && (
-                  <div className="p-4 bg-slate-950 border-t border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-slate-900 p-3 rounded-lg">
-                      <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Datos Técnicos (JSON)</h4>
-                      <pre className="text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap">
-                        {JSON.stringify(reto, null, 2)}
-                      </pre>
-                    </div>
-                    <div className="bg-slate-900 p-3 rounded-lg">
-                      <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Infografía</h4>
-                      {reto.infografia ? (
-                        <img src={reto.infografia} alt="Infografía" className="rounded border border-slate-700 w-full object-contain max-h-60" />
-                      ) : (
-                        <div className="flex items-center justify-center h-40 border border-dashed border-slate-700 text-slate-600 rounded">
-                          Sin infografía
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
