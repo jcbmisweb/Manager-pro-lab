@@ -26,6 +26,14 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, on
 
         <div className="p-6 sm:p-8 space-y-8">
           
+          {/* Infografía */}
+          {challenge.infographicUrl && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Infografía del Proyecto</h2>
+              <img src={challenge.infographicUrl} alt="Infografía" className="w-full rounded-2xl border border-slate-200 shadow-sm" />
+            </section>
+          )}
+
           {/* 1. Estructura de Reto */}
           <section className="space-y-4">
             <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">1. Ficha del Proyecto</h2>

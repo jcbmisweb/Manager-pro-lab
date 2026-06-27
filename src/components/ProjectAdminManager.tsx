@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Challenge } from '../types';
 
 interface ProjectAdminManagerProps {
@@ -9,6 +9,18 @@ interface ProjectAdminManagerProps {
 
 export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challenge, onClose, onSave }) => {
   const [editedChallenge, setEditedChallenge] = useState<Challenge>(challenge);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setEditedChallenge({...editedChallenge, infographicUrl: event.target?.result as string});
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 flex flex-col h-[80vh]">
@@ -29,6 +41,27 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
       
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         
+        {/* Infografía */}
+        <section className="space-y-4">
+          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Infografía del Proyecto</h3>
+          <div className="flex items-center gap-4">
+            {editedChallenge.infographicUrl ? (
+              <img src={editedChallenge.infographicUrl} alt="Infografía" className="w-32 h-32 object-cover rounded-lg border border-slate-300" />
+            ) : (
+              <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
+                Sin imagen
+              </div>
+            )}
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900"
+            >
+              {editedChallenge.infographicUrl ? "Cambiar Infografía" : "Subir Infografía"}
+            </button>
+          </div>
+        </section>
+
         {/* 1. Ficha del Proyecto */}
         <section className="space-y-4">
           <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">1. Ficha del Proyecto (Estructura de Reto)</h3>

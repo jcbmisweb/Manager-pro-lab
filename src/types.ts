@@ -133,6 +133,7 @@ export interface Challenge {
   phFinalEsperado: number;
   bloque: 'A' | 'B' | 'C';
   isPublished?: boolean;
+  infographicUrl?: string;
   insumosBase?: KitchenRecipeSheet[];
   elaboracionPrincipal?: KitchenRecipeSheet;
   cronograma?: LogbookWeekConfig[];
