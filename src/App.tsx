@@ -196,6 +196,40 @@ export default function App() {
 
   const [mensajes, setMensajes] = useState<any[]>([]);
 
+  // Guest tasting survey states
+  const [guestProjectId, setGuestProjectId] = useState<string | null>(null);
+  const [guestProject, setGuestProject] = useState<any | null>(null);
+  const [guestLoading, setGuestLoading] = useState<boolean>(false);
+  const [guestSubmitted, setGuestSubmitted] = useState<boolean>(false);
+  const [guestName, setGuestName] = useState<string>('');
+  const [guestFirmeza, setGuestFirmeza] = useState<number>(3);
+  const [guestUniformidad, setGuestUniformidad] = useState<number>(3);
+  const [guestAcidez, setGuestAcidez] = useState<number>(3);
+  const [guestPersistencia, setGuestPersistencia] = useState<number>(3);
+  const [guestComentario, setGuestComentario] = useState<string>('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const guestId = params.get('guestTasting') || params.get('guestReview');
+    if (guestId) {
+      setGuestProjectId(guestId);
+      setGuestLoading(true);
+      getDoc(doc(db, "proyectos", guestId))
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            setGuestProject({ id: snapshot.id, ...snapshot.data() });
+          } else {
+            console.warn("Guest project not found: ", guestId);
+          }
+          setGuestLoading(false);
+        })
+        .catch((err) => {
+          console.error("Error fetching guest project:", err);
+          setGuestLoading(false);
+        });
+    }
+  }, [guestProjectId]);
+
   // ----------------------------------------------------
   // FIREBASE INITIAL DATA SYNC
   // ----------------------------------------------------
@@ -713,13 +747,18 @@ export default function App() {
   };
 
   // Save TasteLab evaluation
-  const handleSaveFinal = (pesoFinal: number, sensorial: SensorialEvaluation) => {
+  const handleSaveFinal = (pesoFinal: number, sensorial: SensorialEvaluation, degustaciones?: any[]) => {
     if (!openProyectoId) return;
     
-    updateDoc(doc(db, "proyectos", openProyectoId), {
+    const updateObj: any = {
       pesoFinal,
       sensorial
-    }).catch(console.error);
+    };
+    if (degustaciones !== undefined) {
+      updateObj.degustaciones = degustaciones;
+    }
+    
+    updateDoc(doc(db, "proyectos", openProyectoId), updateObj).catch(console.error);
     
     alert("Análisis Sensorial y métricas de sostenibilidad guardadas con éxito.");
   };
@@ -839,8 +878,222 @@ export default function App() {
       {/* 2. MAIN HUB ROUTING CONTENT */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* Loading State */}
-        {isLoading ? (
+        {/* Guest Tasting Survey Page */}
+        {guestProjectId ? (
+          <div className="max-w-xl mx-auto bg-white border border-slate-200 p-8 rounded-2xl shadow-sm space-y-6">
+            {guestLoading ? (
+              <div className="text-center py-12 animate-pulse space-y-2">
+                <Sliders className="w-8 h-8 mx-auto text-slate-300 animate-spin" />
+                <p className="text-xs text-slate-400 font-mono uppercase tracking-widest">Cargando encuesta de cata...</p>
+              </div>
+            ) : !guestProject ? (
+              <div className="text-center py-12 space-y-3">
+                <AlertCircle className="w-10 h-10 mx-auto text-amber-500" />
+                <h3 className="font-bold text-slate-800 text-sm uppercase">Proyecto no encontrado</h3>
+                <p className="text-xs text-slate-500">
+                  El enlace escaneado parece inválido o el proyecto de fermentación ha sido eliminado.
+                </p>
+                <button
+                  onClick={() => { setGuestProjectId(null); window.history.replaceState({}, document.title, window.location.pathname); }}
+                  className="text-xs font-bold text-slate-900 underline mt-4"
+                >
+                  Ir al inicio
+                </button>
+              </div>
+            ) : guestSubmitted ? (
+              <div className="text-center py-12 space-y-4">
+                <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-500" />
+                <h3 className="font-black text-slate-900 text-lg uppercase tracking-wider">¡Valoración Enviada!</h3>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                  Muchas gracias por participar en la cata organoléptica de <strong>{guestProject.nombre}</strong>. Tu opinión ha sido registrada con éxito y ayudará al equipo de alumnos a refinar su receta.
+                </p>
+                <div className="pt-4">
+                  <p className="text-[10px] text-slate-400 font-mono">Proyecto: {guestProject.id}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="text-center space-y-2 pb-4 border-b border-slate-100">
+                  <span className="text-[9px] font-mono bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-extrabold uppercase tracking-widest">
+                    TasteLab Sensorial • Panel de Cata
+                  </span>
+                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                    Evaluación de Colaboradores
+                  </h2>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Has sido invitado/a a probar el lote: <br />
+                    <strong className="text-slate-800 font-extrabold">{guestProject.nombre}</strong>
+                  </p>
+                </div>
+
+                <div className="space-y-5">
+                  {/* Participant Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                      Tu Nombre o Identificador *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Ej. Juan García / Equipo Cata B"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-purple-600 focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  {/* Slider 1: Firmeza */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                        1. Firmeza de la Pasta
+                      </label>
+                      <span className="text-xs font-mono font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                        {guestFirmeza}/5
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={guestFirmeza}
+                      onChange={(e) => setGuestFirmeza(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600 focus:outline-hidden"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>Líquida / Untable (1)</span>
+                      <span>Consistencia Firme (5)</span>
+                    </div>
+                  </div>
+
+                  {/* Slider 2: Uniformidad */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                        2. Uniformidad de la Corteza
+                      </label>
+                      <span className="text-xs font-mono font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                        {guestUniformidad}/5
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={guestUniformidad}
+                      onChange={(e) => setGuestUniformidad(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600 focus:outline-hidden"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>Irregular / Grietas (1)</span>
+                      <span>Homogénea impecable (5)</span>
+                    </div>
+                  </div>
+
+                  {/* Slider 3: Acidez */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                        3. Intensidad de la Acidez
+                      </label>
+                      <span className="text-xs font-mono font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                        {guestAcidez}/5
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={guestAcidez}
+                      onChange={(e) => setGuestAcidez(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600 focus:outline-hidden"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>Plano / Neutro (1)</span>
+                      <span>Ácido láctico balanceado (5)</span>
+                    </div>
+                  </div>
+
+                  {/* Slider 4: Persistencia */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                        4. Persistencia de Retrogusto
+                      </label>
+                      <span className="text-xs font-mono font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                        {guestPersistencia}/5
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={guestPersistencia}
+                      onChange={(e) => setGuestPersistencia(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600 focus:outline-hidden"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>Fugaz / Suave (1)</span>
+                      <span>Sabor curado profundo (5)</span>
+                    </div>
+                  </div>
+
+                  {/* Comment */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                      Opinión General o Comentarios
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={guestComentario}
+                      onChange={(e) => setGuestComentario(e.target.value)}
+                      placeholder="Escribe aquí tus apreciaciones, aromas detectados, recomendaciones de maridaje..."
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-purple-600 focus:bg-white transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    onClick={async () => {
+                      if (!guestName.trim()) {
+                        alert("Por favor, introduce tu nombre antes de enviar.");
+                        return;
+                      }
+                      const newCata = {
+                        id: 'cata-' + Date.now(),
+                        nombre: guestName.trim(),
+                        firmeza: guestFirmeza,
+                        uniformidad: guestUniformidad,
+                        acidez: guestAcidez,
+                        persistencia: guestPersistencia,
+                        comentario: guestComentario.trim(),
+                        fecha: new Date().toISOString()
+                      };
+                      const updatedDegustaciones = [...(guestProject.degustaciones || []), newCata];
+                      try {
+                        await updateDoc(doc(db, "proyectos", guestProjectId), {
+                          degustaciones: updatedDegustaciones
+                        });
+                        setGuestSubmitted(true);
+                      } catch (err) {
+                        console.error("Error saving guest cata:", err);
+                        alert("Hubo un error al guardar tu cata. Por favor, vuelve a intentarlo.");
+                      }
+                    }}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>Enviar Valoración Sensorial</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 animate-pulse">
             <GraduationCap className="w-12 h-12 text-slate-300 animate-spin-slow mb-4" />
             <p className="text-slate-400 font-mono text-xs uppercase tracking-widest">Sincronizando con Firebase...</p>
@@ -1015,6 +1268,8 @@ export default function App() {
                         precioComercialKilo={activeChallenge.precioComercialKilo}
                         semanaMax={activeChallenge.semanaMax}
                         readOnly={openProyectoReadOnly}
+                        degustaciones={activeProject.degustaciones || []}
+                        proyectoId={activeProject.id}
                       />
                     )}
 
