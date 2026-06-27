@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, MessageSquare, Check, CheckCheck, Clock, Paperclip } from 'lucide-react';
 import { Mensaje, Usuario, Aula } from '../types';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
 interface ChatMessengerProps {
   currentUser: {
@@ -25,7 +25,8 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "mensajes"), (snap) => {
+    const q = query(collection(db, "mensajes"), orderBy("fecha", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
       setMensajes(snap.docs.map(doc => doc.data() as Mensaje));
     }, err => console.warn("ChatMessenger snap err:", err));
     return () => unsub();
