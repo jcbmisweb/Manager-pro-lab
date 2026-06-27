@@ -1375,9 +1375,13 @@ export default function App() {
                                 challenge={challengesState.find(c => c.id === managingChallengeId)!} 
                                 onClose={() => setManagingChallengeId(null)}
                                 onSave={(updatedChallenge) => {
+                                  console.log("Saving challenge:", updatedChallenge);
                                   updateDoc(doc(db, "ManagerproLab", updatedChallenge.id), updatedChallenge as any)
                                     .then(() => setManagingChallengeId(null))
-                                    .catch(console.error);
+                                    .catch(error => {
+                                      console.error("Save failed:", error);
+                                      alert("Error al guardar: " + error.message);
+                                    });
                                 }}
                               />
                             ) : (
