@@ -8,13 +8,16 @@ import { ProjectAdminManager } from './ProjectAdminManager';
 const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Eco-Lab'. El JSON debe tener la siguiente estructura:
 {
   "id": "reto-01",
+  "code": "Reto 01-B",
   "name": "Título del reto",
-  "descripcion": "Descripción breve",
+  "descripcion": "Descripción breve del proyecto",
   "emoji": "🔬",
+  "bloque": "A",
   "cronograma": [
-    { "semanas": "1-2", "fase": "Fase inicial", "accionAlumno": "Acción a realizar", "puntoCriticoControl": "Control" }
+    { "semanas": "1-2", "fase": "Fase inicial", "accionAlumno": "Acción a realizar", "puntoCriticoControl": "Control de calidad" }
   ]
 }
+Nota para la propiedad 'bloque': Utiliza "A", "B" o "C" según corresponda. Si no se indica explícitamente, ponle "A" o la categoría que consideres más idónea.
 No incluyas explicaciones adicionales, ni marcas de código como \`\`\`json. Solo el objeto JSON puro.`;
 
 export function RetoCreator() {
@@ -84,8 +87,23 @@ export function RetoCreator() {
     try {
       if (!objetoReto.id) objetoReto.id = 'reto-' + Date.now();
       
+      // Determine logical block
+      let detectedBloque = objetoReto.bloque || 'A';
+      if (typeof detectedBloque === 'string') {
+        detectedBloque = detectedBloque.trim().toUpperCase();
+        if (!['A', 'B', 'C'].includes(detectedBloque)) {
+          detectedBloque = 'A';
+        }
+      } else {
+        detectedBloque = 'A';
+      }
+
       // Merge with default values if they are missing
       const retoFinal = {
+        code: objetoReto.code || objetoReto.id.toUpperCase(),
+        name: objetoReto.name || objetoReto.titulo || 'Nuevo Reto',
+        emoji: objetoReto.emoji || '🔬',
+        bloque: detectedBloque,
         ...objetoReto,
         isPublished: true,
       };

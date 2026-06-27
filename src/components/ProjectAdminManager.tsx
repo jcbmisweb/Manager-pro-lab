@@ -32,10 +32,11 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
         {/* Identificación del Proyecto */}
         <section className="space-y-4">
           <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Identificación del Proyecto</h3>
-          <div className="flex gap-4">
+          
+          <div className="flex flex-col md:flex-row gap-4">
             {/* Nombre del Proyecto */}
             <div className="space-y-2 flex-1">
-              <label className="text-xs font-bold text-slate-600">Nombre del Proyecto</label>
+              <label className="text-xs font-bold text-slate-600 block">Nombre del Proyecto</label>
               <input 
                 type="text"
                 value={editedChallenge.name || ''}
@@ -44,16 +45,45 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
               />
             </div>
+          </div>
 
+          <div className="flex gap-4">
             {/* Código del Proyecto */}
             <div className="space-y-2 w-32">
-              <label className="text-xs font-bold text-slate-600">Código</label>
+              <label className="text-xs font-bold text-slate-600 block">Código</label>
               <input 
                 type="text"
                 value={editedChallenge.code || ''}
                 onChange={e => setEditedChallenge({...editedChallenge, code: e.target.value})}
                 placeholder="PROY-01"
                 className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none font-mono"
+              />
+            </div>
+
+            {/* Bloque del Proyecto */}
+            <div className="space-y-2 flex-1">
+              <label className="text-xs font-bold text-slate-600 block font-bold text-indigo-900">Bloque / Categoría</label>
+              <select 
+                value={editedChallenge.bloque || 'A'}
+                onChange={e => setEditedChallenge({...editedChallenge, bloque: e.target.value as 'A' | 'B' | 'C'})}
+                className="w-full text-sm p-2 bg-indigo-50 border border-indigo-200 text-indigo-950 font-bold rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow outline-none"
+              >
+                <option value="A">Bloque A</option>
+                <option value="B">Bloque B</option>
+                <option value="C">Bloque C</option>
+              </select>
+            </div>
+
+            {/* Emoji */}
+            <div className="space-y-2 w-24">
+              <label className="text-xs font-bold text-slate-600 block">Icono / Emoji</label>
+              <input 
+                type="text"
+                value={editedChallenge.emoji || '🔬'}
+                onChange={e => setEditedChallenge({...editedChallenge, emoji: e.target.value})}
+                placeholder="🔬"
+                maxLength={4}
+                className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-center outline-none"
               />
             </div>
           </div>
