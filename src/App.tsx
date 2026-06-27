@@ -18,6 +18,7 @@ import { BitacoraControl } from './components/BitacoraControl';
 import { TasteLabSostenibilidad } from './components/TasteLabSostenibilidad';
 import { ChatMessenger } from './components/ChatMessenger';
 import { ReportViewer } from './components/ReportViewer';
+import { RetoCreator } from './components/RetoCreator';
 import { compressImage } from './utils/imageCompressor';
 import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
 import { db } from './firebase';
@@ -175,7 +176,7 @@ export default function App() {
   const [activeLabTab, setActiveLabTab] = useState<'bitacora' | 'tastelab'>('bitacora');
 
   // Sub-dashboard tab states
-  const [adminTab, setAdminTab] = useState<'ies' | 'aulas' | 'alumnos' | 'proyectos'>('ies');
+  const [adminTab, setAdminTab] = useState<'ies' | 'aulas' | 'alumnos' | 'proyectos' | 'digitalizacion'>('ies');
   const [activeCatalogId, setActiveCatalogId] = useState<string | null>(null);
 
   // Project Admin States
@@ -282,6 +283,21 @@ export default function App() {
     };
   }, []);
 
+  // Synchronize user state when usuarios updates in real-time
+  useEffect(() => {
+    if (user && usuarios.length > 0) {
+      const currentUser = usuarios.find(u => u.id === user.id);
+      if (currentUser && (currentUser.aulaId !== user.aulaId || currentUser.rol !== user.role || currentUser.estado !== user.estado)) {
+        setUser(prev => prev ? {
+          ...prev,
+          aulaId: currentUser.aulaId,
+          role: currentUser.rol,
+          estado: currentUser.estado
+        } : null);
+      }
+    }
+  }, [usuarios, user?.id]);
+
   // ----------------------------------------------------
   // III. SAVING AND STORAGE SYNCHRONIZATION
   // ----------------------------------------------------
@@ -314,6 +330,7 @@ export default function App() {
           let currentUserRole: 'admin' | 'profesor' | 'alumno' = 'alumno';
           let currentUserEstado: 'activo' | 'bloqueado' | 'suspendido' | 'eliminado' = 'activo';
           let currentUserName = firebaseUser.displayName || 'Usuario Google';
+          let currentAulaId: string | undefined = undefined;
 
           if (!userSnap.exists()) {
             // El usuario es nuevo en el sistema
@@ -336,6 +353,7 @@ export default function App() {
             currentUserRole = data.rol;
             currentUserEstado = data.estado || 'activo';
             currentUserName = data.nombre || currentUserName;
+            currentAulaId = data.aulaId;
           }
 
           setUser({
@@ -344,7 +362,8 @@ export default function App() {
             email: userEmail,
             role: currentUserRole,
             loggedIn: true,
-            estado: currentUserEstado
+            estado: currentUserEstado,
+            aulaId: currentAulaId
           });
         } catch (e) {
           console.error("Error cargando perfil de usuario:", e);
@@ -1065,6 +1084,16 @@ export default function App() {
                         >
                           Proyectos
                         </button>
+                        <button
+                          onClick={() => setAdminTab('digitalizacion')}
+                          className={`pb-2.5 text-xs font-bold px-1.5 transition-all border-b-2 cursor-pointer ${
+                            adminTab === 'digitalizacion'
+                              ? 'border-red-600 text-slate-900'
+                              : 'border-transparent text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Puente de Digitalización IA
+                        </button>
                       </div>
 
                       <div className="pt-6">
@@ -1396,6 +1425,13 @@ export default function App() {
                                 </div>
                               </>
                             )}
+                          </div>
+                        )}
+
+                        {/* Tab A.5: PUENTE DE DIGITALIZACIÓN */}
+                        {adminTab === 'digitalizacion' && (
+                          <div className="space-y-4">
+                            <RetoCreator />
                           </div>
                         )}
 

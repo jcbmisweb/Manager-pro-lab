@@ -1,24 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Clipboard, Wand2, ArrowRight, Trash2, Database, Zap } from 'lucide-react';
-import { CHALLENGES, MODULO_INFO } from '../types';
+import { CHALLENGES, MODULO_INFO, Challenge } from '../types';
+import { db } from '../firebase';
+import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
 
 const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Manager pro LAB'. El JSON debe tener la siguiente estructura:
 {
   "id": "reto-01",
-  "titulo": "Título del reto",
+  "name": "Título del reto",
   "descripcion": "Descripción breve",
   "emoji": "🔬",
-  "puntos_criticos": {
-    "parametro_evaluacion": "Parámetro a evaluar",
-    "tipo_control": "slider-temperatura",
-    "min_seguro": 20,
-    "max_seguro": 25
-  },
-  "semaforo_valores": {
-    "verde": "Todo correcto",
-    "amarillo": "Alerta leve",
-    "rojo": "Peligro"
-  }
+  "cronograma": [
+    { "semanas": "1-2", "fase": "Fase inicial", "accionAlumno": "Acción a realizar", "puntoCriticoControl": "Control" }
+  ]
 }
 No incluyas explicaciones adicionales, ni marcas de código como \`\`\`json. Solo el objeto JSON puro.`;
 
@@ -33,20 +27,12 @@ export function RetoCreator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    cargarRetos();
+    const unsub = onSnapshot(collection(db, 'ManagerproLab'), (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), type: 'dinamico', expanded: false } as any));
+      setAllProjects(fetched);
+    });
+    return () => unsub();
   }, []);
-
-  const cargarRetos = () => {
-    const catalogo = JSON.parse(localStorage.getItem('mpl_catalogo_retos_dinamicos') || '{}');
-    const ocultosSistema = JSON.parse(localStorage.getItem('mpl_ocultos_sistema') || '[]');
-    
-    const proyectos = [
-      ...CHALLENGES.filter(c => !ocultosSistema.includes(c.id)).map(c => ({ ...c, type: 'sistema', expanded: false })),
-      ...Object.values(catalogo).map((r: any) => ({ ...r, type: 'dinamico', expanded: false }))
-    ];
-    setRetos(Object.values(catalogo));
-    setAllProjects(proyectos);
-  };
 
   const copyPrompt = () => {
     navigator.clipboard.writeText(PROMPT_MAESTRO);
@@ -64,15 +50,10 @@ export function RetoCreator() {
     }
   };
 
-  const publicarNuevoReto = () => {
+  const publicarNuevoReto = async () => {
     let cleanJson = jsonText.trim();
-    // Limpiar etiquetas de citación si existen
     cleanJson = cleanJson.replace(/\[cite\]/g, '').replace(/\[cite_start\]/g, '');
-    // Quitar marcas de código si quedaron
     cleanJson = cleanJson.replace(/^```json/, '').replace(/```$/, '');
-
-    console.log("Intentando procesar JSON:", cleanJson);
-    console.log("¿Tiene infografía?", !!infografiaBase64);
 
     if (!cleanJson) {
       alert("Por favor, introduce primero el texto estructurado (JSON) que te dio la IA.");
@@ -82,18 +63,12 @@ export function RetoCreator() {
     let objetoReto;
     try {
       objetoReto = JSON.parse(cleanJson);
-      console.log("JSON parseado:", objetoReto);
     } catch (error) {
       console.error("Error al parsear JSON:", error);
       alert("Error en el formato del JSON: Asegúrate de que el texto sea un JSON válido y sin caracteres extraños.");
       return;
     }
 
-    // Ensure bloque is present
-    if (!objetoReto.bloque) {
-      objetoReto.bloque = 'A'; // Default block
-    }
-    
     if (incluirInfografia) {
       if (!infografiaBase64) {
         alert("Es obligatorio subir una imagen de infografía si has marcado incluirla.");
@@ -103,64 +78,48 @@ export function RetoCreator() {
     } else {
       objetoReto.infografia = null;
     }
-    
+
     try {
-      let catalogoGlobal = JSON.parse(localStorage.getItem('mpl_catalogo_retos_dinamicos') || '{}');
-      catalogoGlobal[objetoReto.id] = objetoReto;
-      console.log("Guardando en localStorage...");
-      localStorage.setItem('mpl_catalogo_retos_dinamicos', JSON.stringify(catalogoGlobal));
-      console.log("Guardado con éxito.");
+      if (!objetoReto.id) objetoReto.id = 'reto-' + Date.now();
+      
+      // Merge with default values if they are missing
+      const retoFinal = {
+        ...objetoReto,
+        isPublished: true,
+      };
+
+      await setDoc(doc(db, "ManagerproLab", retoFinal.id), retoFinal);
       
       setSuccess(true);
       setJsonText('');
       setInfografiaBase64('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       
-      cargarRetos();
-      
       setTimeout(() => setSuccess(false), 5000);
     } catch (error) {
-      console.error("Error al guardar en localStorage:", error);
-      alert("Error al guardar: El almacenamiento puede estar lleno (" + error + "). Por favor, borra algunos proyectos o usa el botón de limpiar todo.");
+      console.error("Error al guardar en Firebase:", error);
+      alert("Error al guardar: " + error);
     }
   };
 
   const limpiarTodo = () => {
-    if (window.confirm("¿Estás seguro de que quieres borrar TODOS los proyectos dinámicos? Esta acción no se puede deshacer.")) {
-      localStorage.removeItem('mpl_catalogo_retos_dinamicos');
-      cargarRetos();
+    if (window.confirm("¿Estás seguro de que quieres borrar TODOS los proyectos dinámicos? Esta acción no se puede deshacer. Se borrarán de la base de datos de todos los usuarios.")) {
+      allProjects.forEach(async (p) => {
+        await deleteDoc(doc(db, "ManagerproLab", p.id));
+      });
       alert("Almacenamiento limpiado.");
     }
   };
 
-  const borrarReto = (id: string, type: 'sistema' | 'dinamico') => {
+  const borrarReto = async (id: string, type: string) => {
     if (window.confirm(`¿Estás seguro de que quieres borrar el reto ${id}?`)) {
       if (window.confirm(`Última advertencia: ¿Estás realmente seguro de borrar el reto ${id}? Esta acción no se puede deshacer.`)) {
-        if (type === 'dinamico') {
-          let catalogoGlobal = JSON.parse(localStorage.getItem('mpl_catalogo_retos_dinamicos') || '{}');
-          delete catalogoGlobal[id];
-          try {
-            try {
-          localStorage.setItem('mpl_catalogo_retos_dinamicos', JSON.stringify(catalogoGlobal));
-        } catch (e) {
-          console.error(e);
-          alert("El almacenamiento está lleno. Por favor, borra algunos proyectos antes de añadir nuevos.");
-          return;
+        try {
+          await deleteDoc(doc(db, "ManagerproLab", id));
+        } catch (error) {
+          console.error("Error al borrar el reto:", error);
+          alert("Error al borrar el reto.");
         }
-          } catch (e) {
-            console.error(e);
-            alert("El almacenamiento está lleno. Por favor, borra algunos proyectos antes de añadir nuevos.");
-            return;
-          }
-        } else {
-          // Sistema
-          let ocultos = JSON.parse(localStorage.getItem('mpl_ocultos_sistema') || '[]');
-          if (!ocultos.includes(id)) {
-            ocultos.push(id);
-            localStorage.setItem('mpl_ocultos_sistema', JSON.stringify(ocultos));
-          }
-        }
-        cargarRetos();
       }
     }
   };
@@ -257,89 +216,60 @@ export function RetoCreator() {
       </div>
             {/* GESTIÓN DE RETOS */}
       <div className="bg-slate-900 rounded-3xl p-8 border border-slate-800">
-        <h2 className="text-2xl font-bold mb-6">Retos Actuales - {MODULO_INFO.nombre}</h2>
-        <div className="mb-4 text-sm text-slate-400">
-          <p>Curso: {MODULO_INFO.curso} | Nivel: {MODULO_INFO.nivel}</p>
-          <p>Profesor: {MODULO_INFO.profesor}</p>
-        </div>
+        <h2 className="text-2xl font-bold mb-6">Retos Actuales - Base de datos</h2>
         
-        {['A', 'B', 'C'].map(bloque => (
-          <div key={bloque} className="mb-6">
-            <h3 className="text-lg font-bold mb-3 text-emerald-400">Bloque {bloque}</h3>
-            {allProjects.filter(p => p.bloque === bloque).length === 0 ? (
-              <p className="text-slate-500 text-sm italic">No hay retos en este bloque.</p>
-            ) : (
-              <div className="space-y-4">
-                {allProjects.filter(p => p.bloque === bloque).map((reto: any) => (
-                  <div 
-                    key={reto.id} 
-                    className={`bg-slate-800 rounded-xl border border-slate-700 transition-all overflow-hidden ${expandedId === reto.id ? 'border-emerald-500 ring-1 ring-emerald-500/30' : ''}`}
+        <div className="mb-6">
+          <div className="space-y-4">
+            {allProjects.map((reto: any) => (
+              <div 
+                key={reto.id} 
+                className={`bg-slate-800 rounded-xl border border-slate-700 transition-all overflow-hidden ${expandedId === reto.id ? 'border-emerald-500 ring-1 ring-emerald-500/30' : ''}`}
+              >
+                <div 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-700/50"
+                  onClick={() => setExpandedId(expandedId === reto.id ? null : reto.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Database size={16} className="text-blue-400" title="Proyecto del Sistema" />
+                    <div>
+                      <span className="font-semibold text-slate-100 block">{reto.name || reto.titulo} ({reto.id})</span>
+                      <span className="text-xs text-slate-400 block">{reto.descripcion}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); borrarReto(reto.id, 'dinamico'); }}
+                    className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                    title="Borrar reto"
                   >
-                    <div 
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-700/50"
-                      onClick={() => setExpandedId(expandedId === reto.id ? null : reto.id)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {reto.type === 'sistema' ? (
-                          <Database size={16} className="text-blue-400" title="Proyecto del Sistema" />
-                        ) : (
-                          <Zap size={16} className="text-emerald-400" title="Proyecto Dinámico" />
-                        )}
-                        <div>
-                          <span className="font-semibold text-slate-100 block">{reto.titulo} ({reto.id})</span>
-                          <span className="text-xs text-slate-400 block">{reto.descripcion}</span>
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+                
+                {/* Vista Expandida */}
+                {expandedId === reto.id && (
+                  <div className="p-4 bg-slate-950 border-t border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-900 p-3 rounded-lg">
+                      <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Datos Técnicos (JSON)</h4>
+                      <pre className="text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap">
+                        {JSON.stringify(reto, null, 2)}
+                      </pre>
+                    </div>
+                    <div className="bg-slate-900 p-3 rounded-lg">
+                      <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Infografía</h4>
+                      {reto.infografia ? (
+                        <img src={reto.infografia} alt="Infografía" className="rounded border border-slate-700 w-full object-contain max-h-60" />
+                      ) : (
+                        <div className="flex items-center justify-center h-40 border border-dashed border-slate-700 text-slate-600 rounded">
+                          Sin infografía
                         </div>
-                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${reto.type === 'sistema' ? 'bg-blue-900/30 text-blue-400' : 'bg-emerald-900/30 text-emerald-400'}`}>
-                          {reto.type}
-                        </span>
-                      </div>
-                      {reto.type === 'dinamico' && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); borrarReto(reto.id, 'dinamico'); }}
-                          className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
-                          title="Borrar reto"
-                        >
-                          <Trash2 size={20} />
-                        </button>
-                      )}
-                      {reto.type === 'sistema' && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); borrarReto(reto.id, 'sistema'); }}
-                          className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
-                          title="Ocultar reto de sistema"
-                        >
-                          <Trash2 size={20} />
-                        </button>
                       )}
                     </div>
-                    
-                    {/* Vista Expandida */}
-                    {expandedId === reto.id && (
-                      <div className="p-4 bg-slate-950 border-t border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-slate-900 p-3 rounded-lg">
-                          <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Datos Técnicos (JSON)</h4>
-                          <pre className="text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap">
-                            {JSON.stringify(reto, null, 2)}
-                          </pre>
-                        </div>
-                        <div className="bg-slate-900 p-3 rounded-lg">
-                          <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase">Infografía</h4>
-                          {reto.infografia ? (
-                            <img src={reto.infografia} alt="Infografía" className="rounded border border-slate-700 w-full object-contain max-h-60" />
-                          ) : (
-                            <div className="flex items-center justify-center h-40 border border-dashed border-slate-700 text-slate-600 rounded">
-                              Sin infografía
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
