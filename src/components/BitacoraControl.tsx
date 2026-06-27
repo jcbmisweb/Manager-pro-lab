@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download, BookOpen, Plus } from 'lucide-react';
+import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download, BookOpen, Plus, CheckCircle2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
 import { SemanalLog, Challenge, LogbookWeekConfig, DiarioEntry } from '../types';
@@ -146,12 +146,12 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
   };
 
   const getAlertInfo = (val: number) => {
-    if (val < 4.5) {
-      return { level: 'safe', className: 'text-emerald-800 bg-emerald-50 border-emerald-200', badge: '🟢 SEGURO' };
-    } else if (val >= 4.5 && val <= 4.6) {
-      return { level: 'warning', className: 'text-amber-800 bg-amber-50 border-amber-200', badge: '🟡 ALERTA KAHM' };
+    if (val <= 4.5) {
+      return { level: 'safe', className: 'text-emerald-800 bg-emerald-50 border border-emerald-200', badge: '🟢 SEGURO' };
+    } else if (val <= 5.0) {
+      return { level: 'warning', className: 'text-amber-800 bg-amber-50 border border-amber-200', badge: '🟠 PRECAUCIÓN' };
     } else {
-      return { level: 'danger', className: 'text-red-800 bg-red-50 border-red-200', badge: '🔴 PELIGRO' };
+      return { level: 'danger', className: 'text-red-800 bg-red-50 border border-red-200', badge: '🔴 CRÍTICO' };
     }
   };
 
@@ -196,8 +196,8 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
             if (isCompleted) {
               const lastPhEntry = phaseEntries.find(d => !d.skipPh);
               if (lastPhEntry && lastPhEntry.ph !== undefined) {
-                if (lastPhEntry.ph < 4.5) statusDot = 'bg-emerald-500';
-                else if (lastPhEntry.ph < 5.0) statusDot = 'bg-amber-500';
+                if (lastPhEntry.ph <= 4.5) statusDot = 'bg-emerald-500';
+                else if (lastPhEntry.ph <= 5.0) statusDot = 'bg-amber-500';
                 else statusDot = 'bg-red-500';
               } else {
                  statusDot = 'bg-blue-500'; // Has entries but no pH
@@ -326,7 +326,13 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
                 <div className="pt-2">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs text-slate-500">Desliza para ajustar:</span>
-                    <span className={`font-mono font-bold px-2 py-1 rounded text-sm ${isUnsafePh ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+                    <span className={`font-mono font-bold px-2 py-1 rounded text-sm ${
+                      localPh <= 4.5 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                        : localPh <= 5.0 
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                        : 'bg-red-100 text-red-700 border border-red-300'
+                    }`}>
                       pH {localPh.toFixed(1)}
                     </span>
                   </div>
@@ -335,18 +341,37 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
                     min="3.0" max="7.0" step="0.1"
                     value={localPh}
                     onChange={(e) => setLocalPh(parseFloat(e.target.value))}
-                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isUnsafePh ? 'bg-red-200 accent-red-600' : 'bg-slate-200 accent-slate-900'}`}
+                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                      localPh <= 4.5 
+                        ? 'bg-emerald-200 accent-emerald-600' 
+                        : localPh <= 5.0 
+                        ? 'bg-amber-200 accent-amber-500' 
+                        : 'bg-red-200 accent-red-600'
+                    }`}
                   />
                   <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2">
                     <span>3.0</span>
-                    <span className={isUnsafePh ? 'text-red-600 font-bold' : ''}>4.5 (Crítico)</span>
-                    <span className={isUnsafePh ? 'text-red-600 font-bold underline' : ''}>5.0 (Seguro)</span>
+                    <span className={localPh <= 4.5 ? 'text-emerald-600 font-bold underline' : ''}>4.5 (PCC Seguro)</span>
+                    <span className={localPh > 4.5 && localPh <= 5.0 ? 'text-amber-600 font-bold underline' : ''}>5.0 (Alerta)</span>
+                    <span className={localPh > 5.0 ? 'text-red-600 font-bold underline' : ''}>&gt;5.0 (Crítico)</span>
                     <span>7.0</span>
                   </div>
-                  {isUnsafePh && (
-                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800 font-semibold animate-pulse flex gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      El valor de pH supera el límite seguro (&gt; 5.0).
+                  {localPh <= 4.5 && (
+                    <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-800 font-semibold flex gap-2 items-center">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <span>Zona Segura (Verde): Acidez óptima alcanzada (pH ≤ 4.5).</span>
+                    </div>
+                  )}
+                  {localPh > 4.5 && localPh <= 5.0 && (
+                    <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 font-semibold flex gap-2 items-center">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                      <span>Zona de Alerta (Naranja): Acercándose al límite crítico de seguridad (4.5 - 5.0).</span>
+                    </div>
+                  )}
+                  {localPh > 5.0 && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800 font-semibold animate-pulse flex gap-2 items-center">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>Zona de Peligro (Rojo): El valor de pH supera el límite seguro (&gt; 5.0).</span>
                     </div>
                   )}
                 </div>
@@ -403,7 +428,7 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
                   </span>
                   {!entry.skipPh && entry.ph !== undefined && (
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getAlertInfo(entry.ph).className}`}>
-                      pH {entry.ph.toFixed(1)}
+                      {getAlertInfo(entry.ph).badge} (pH {entry.ph.toFixed(1)})
                     </span>
                   )}
                   {entry.skipPh && (
