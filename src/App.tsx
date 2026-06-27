@@ -943,7 +943,9 @@ export default function App() {
                       Inicialización Científica del Lote de Cultivo
                     </h3>
                     <ConfiguracionInicial
-                      pesoInicialDefault={activeChallenge.initialWeightDefault}
+                      pesoInicial={activeChallenge.initialWeightDefault}
+                      tipoInoculante={activeChallenge.inoculantOptions[0]}
+                      fechaInicio={null}
                       inoculanteOptions={activeChallenge.inoculantOptions}
                       materiaPrimaLabel={activeChallenge.materiaPrimaLabel}
                       onStart={(peso, inoculante) => {
