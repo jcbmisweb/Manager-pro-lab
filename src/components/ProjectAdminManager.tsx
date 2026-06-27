@@ -29,6 +29,36 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
       
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         
+        {/* Identificación del Proyecto */}
+        <section className="space-y-4">
+          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Identificación del Proyecto</h3>
+          <div className="flex gap-4">
+            {/* Nombre del Proyecto */}
+            <div className="space-y-2 flex-1">
+              <label className="text-xs font-bold text-slate-600">Nombre del Proyecto</label>
+              <input 
+                type="text"
+                value={editedChallenge.name || ''}
+                onChange={e => setEditedChallenge({...editedChallenge, name: e.target.value})}
+                placeholder="Nombre del proyecto"
+                className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
+              />
+            </div>
+
+            {/* Código del Proyecto */}
+            <div className="space-y-2 w-32">
+              <label className="text-xs font-bold text-slate-600">Código</label>
+              <input 
+                type="text"
+                value={editedChallenge.code || ''}
+                onChange={e => setEditedChallenge({...editedChallenge, code: e.target.value})}
+                placeholder="PROY-01"
+                className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none font-mono"
+              />
+            </div>
+          </div>
+        </section>
+
         {/* Infografía y PDF - Ahora con enlaces de Drive */}
         <section className="space-y-4">
           <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Documentación del Proyecto (Enlaces Drive)</h3>
