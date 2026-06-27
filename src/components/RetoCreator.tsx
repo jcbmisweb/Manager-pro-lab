@@ -4,7 +4,7 @@ import { CHALLENGES, MODULO_INFO, Challenge } from '../types';
 import { db } from '../firebase';
 import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
 
-const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Manager pro LAB'. El JSON debe tener la siguiente estructura:
+const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Eco-Lab'. El JSON debe tener la siguiente estructura:
 {
   "id": "reto-01",
   "name": "Título del reto",

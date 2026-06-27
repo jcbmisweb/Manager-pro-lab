@@ -1,6 +1,6 @@
 {
-  "name": "Copia exacta 25/6/26 Manager pro LAB ",
-  "description": "Suite web interactiva de control técnico, bitácora de pH y evaluación sensorial para retos científicos y bioprocesos de alta cocina.",
+  "name": "Eco-Lab: Retos de Cocina Sostenible y Conservación Biológica",
+  "description": "Suite web interactiva para el módulo de Innovaciones en cocina sostenible, control técnico, bitácora de pH y evaluación sensorial.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

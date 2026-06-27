@@ -591,19 +591,33 @@ export default function App() {
 
   // Student Project initiation
   const handleStartProject = (challengeId: string, title: string) => {
+    console.log("handleStartProject called with:", { challengeId, title });
+    console.log("Current user:", user);
     if (!user) {
+      console.warn("No user found!");
       alert("Inicia sesión para iniciar un proyecto.");
       return;
     }
     
     // Check if classroom is assigned
     if (user.role === 'alumno' && !user.aulaId) {
+      console.warn("User is alumno but no aulaId!");
       alert("Debes tener asignada una clase por el Administrador antes de iniciar un proyecto.");
       return;
     }
 
     const challenge = challengesState.find(c => c.id === challengeId);
-    if (!challenge) return;
+    console.log("Found challenge:", challenge);
+    if (!challenge) {
+      console.error("Challenge not found for ID:", challengeId);
+      return;
+    }
+
+    const userProjects = proyectos.filter(p => p.alumnoId === user.id);
+    if (userProjects.length >= 5) {
+      alert("Has alcanzado el límite de 5 proyectos. Elimina alguno para poder iniciar uno nuevo.");
+      return;
+    }
 
     // Create default week records
     const semanasMap: Record<number, SemanalLog> = {};
@@ -631,6 +645,7 @@ export default function App() {
     };
 
     setDoc(doc(db, "proyectos", nuevoP.id), nuevoP).catch(console.error);
+    setProyectos(prev => [...prev, nuevoP as unknown as Challenge]);
     setOpenProyectoId(nuevoP.id);
     setOpenProyectoReadOnly(false);
     setSelectedWeek(1);
@@ -1631,6 +1646,18 @@ export default function App() {
                                     {p.nombre}
                                   </h4>
                                   <p className="text-[10px] text-slate-400 font-medium">Inoculante: {p.tipoInoculante}</p>
+                                  
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm("¿Seguro que deseas eliminar este proyecto?")) {
+                                        deleteDoc(doc(db, "proyectos", p.id)).catch(console.error);
+                                        setProyectos(prev => prev.filter(pr => pr.id !== p.id));
+                                      }
+                                    }}
+                                    className="text-[10px] text-red-500 font-bold hover:underline mt-2"
+                                  >
+                                    Eliminar
+                                  </button>
                                   
                                   {/* pH Traffic Light Indicator */}
                                   {(() => {

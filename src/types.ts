@@ -134,6 +134,7 @@ export interface Challenge {
   bloque: 'A' | 'B' | 'C';
   isPublished?: boolean;
   infographicUrl?: string;
+  pdfUrl?: string;
   insumosBase?: KitchenRecipeSheet[];
   elaboracionPrincipal?: KitchenRecipeSheet;
   cronograma?: LogbookWeekConfig[];

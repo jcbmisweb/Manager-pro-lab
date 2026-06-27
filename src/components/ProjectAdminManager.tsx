@@ -10,13 +10,14 @@ interface ProjectAdminManagerProps {
 export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challenge, onClose, onSave }) => {
   const [editedChallenge, setEditedChallenge] = useState<Challenge>(challenge);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'infographicUrl' | 'pdfUrl') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setEditedChallenge({...editedChallenge, infographicUrl: event.target?.result as string});
+        setEditedChallenge({...editedChallenge, [field]: event.target?.result as string});
       };
       reader.readAsDataURL(file);
     }
@@ -41,24 +42,53 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
       
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         
-        {/* Infografía */}
+        {/* Infografía y PDF */}
         <section className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Infografía del Proyecto</h3>
-          <div className="flex items-center gap-4">
-            {editedChallenge.infographicUrl ? (
-              <img src={editedChallenge.infographicUrl} alt="Infografía" className="w-32 h-32 object-cover rounded-lg border border-slate-300" />
-            ) : (
-              <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
-                Sin imagen
+          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Documentación del Proyecto</h3>
+          <div className="flex gap-4">
+            {/* Infografía */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600">Infografía</label>
+              <div className="flex items-center gap-4">
+                {editedChallenge.infographicUrl ? (
+                  <img src={editedChallenge.infographicUrl} alt="Infografía" className="w-32 h-32 object-cover rounded-lg border border-slate-300" />
+                ) : (
+                  <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
+                    Sin imagen
+                  </div>
+                )}
+                <input type="file" ref={fileInputRef} onChange={(e) => handleFileChange(e, 'infographicUrl')} accept="image/*" className="hidden" />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900"
+                >
+                  {editedChallenge.infographicUrl ? "Cambiar" : "Subir"}
+                </button>
               </div>
-            )}
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900"
-            >
-              {editedChallenge.infographicUrl ? "Cambiar Infografía" : "Subir Infografía"}
-            </button>
+            </div>
+
+            {/* PDF */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600">Ficha PDF</label>
+              <div className="flex items-center gap-4">
+                {editedChallenge.pdfUrl ? (
+                  <div className="w-32 h-32 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center text-blue-800 text-xs font-bold">
+                    PDF Cargado
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
+                    Sin archivo
+                  </div>
+                )}
+                <input type="file" ref={pdfInputRef} onChange={(e) => handleFileChange(e, 'pdfUrl')} accept="application/pdf" className="hidden" />
+                <button 
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700"
+                >
+                  {editedChallenge.pdfUrl ? "Cambiar PDF" : "Subir PDF"}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

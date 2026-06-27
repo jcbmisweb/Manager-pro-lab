@@ -119,7 +119,7 @@ export function ReportViewer({
                   {iesConfig.nombre || "IES Valle de Leiva"}
                 </span>
                 <p className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold mt-0.5">
-                  Centro Tecnológico de Investigación Alimentaria
+                  Innovaciones en cocina sostenible
                 </p>
                 <h1 className="report-title font-extrabold text-lg mt-2 text-slate-800 uppercase">
                   Informe Técnico de Laboratorio y Bioprocesos

@@ -30,9 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="bg-gradient-to-tr from-amber-500 to-orange-600 text-white p-2 rounded-lg flex items-center justify-center">
               <Beaker className="w-5 h-5" />
             </div>
-            <span className="text-sm font-bold tracking-widest text-white uppercase font-mono">
-              Manager pro LAB
-            </span>
+              Eco-Lab
           </div>
           <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
             Suite Digital v2.0
@@ -84,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold tracking-widest text-slate-400 uppercase font-mono">
-                  Manager pro LAB
+                  Eco-Lab
                 </span>
                 {activeChallenge && (
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border bg-white shadow-3xs text-slate-800 border-slate-200`}>

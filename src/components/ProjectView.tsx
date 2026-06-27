@@ -27,10 +27,25 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, on
         <div className="p-6 sm:p-8 space-y-8">
           
           {/* Infografía */}
-          {challenge.infographicUrl && (
+          {(challenge.infographicUrl || challenge.pdfUrl) && (
             <section className="space-y-4">
-              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Infografía del Proyecto</h2>
-              <img src={challenge.infographicUrl} alt="Infografía" className="w-full rounded-2xl border border-slate-200 shadow-sm" />
+              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Documentación del Proyecto</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {challenge.infographicUrl && (
+                  <img src={challenge.infographicUrl} alt="Infografía" className="w-full rounded-2xl border border-slate-200 shadow-sm" />
+                )}
+                {challenge.pdfUrl && (
+                  <a 
+                    href={challenge.pdfUrl} 
+                    download={`${challenge.name}.pdf`}
+                    className="flex flex-col items-center justify-center p-8 bg-blue-50 rounded-2xl border border-blue-200 text-blue-800 hover:bg-blue-100 transition-colors gap-4"
+                  >
+                    <span className="text-4xl">📄</span>
+                    <span className="font-bold text-center">Descargar Ficha Técnica (PDF)</span>
+                  </a>
+                )}
+              </div>
             </section>
           )}
 
@@ -168,7 +183,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, on
               <button 
                 onClick={() => {
                   onStartProject(challenge.id, `Proyecto: ${challenge.name}`);
-                  onClose();
                 }}
                 className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold transition-all shadow-md flex items-center gap-2"
               >

@@ -77,7 +77,7 @@ export function AdminPanel() {
     <div className="container mx-auto p-4 space-y-6 text-slate-100">
       <header className="border-b border-slate-700 pb-4 mb-6">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
-          Manager pro LAB • Panel de Control Raíz
+          Eco-Lab: Retos de Cocina Sostenible y Conservación Biológica • Panel de Control Raíz
         </h1>
         <p className="text-slate-400">Estructura de Clases y Gestión de Permisos</p>
       </header>
