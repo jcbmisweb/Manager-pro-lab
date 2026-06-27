@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Challenge } from '../types';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ProjectAdminManagerProps {
   challenge: Challenge;
@@ -9,17 +11,25 @@ interface ProjectAdminManagerProps {
 
 export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challenge, onClose, onSave }) => {
   const [editedChallenge, setEditedChallenge] = useState<Challenge>(challenge);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'infographicUrl' | 'pdfUrl') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'infographicUrl' | 'pdfUrl') => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setEditedChallenge({...editedChallenge, [field]: event.target?.result as string});
-      };
-      reader.readAsDataURL(file);
+      setUploading(prev => ({ ...prev, [field]: true }));
+      try {
+        const storageRef = ref(storage, `challenges/${editedChallenge.id}/${field}/${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        setEditedChallenge({...editedChallenge, [field]: downloadUrl});
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error al subir el archivo.");
+      } finally {
+        setUploading(prev => ({ ...prev, [field]: false }));
+      }
     }
   };
 
@@ -60,9 +70,10 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 <input type="file" ref={fileInputRef} onChange={(e) => handleFileChange(e, 'infographicUrl')} accept="image/*" className="hidden" />
                 <button 
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900"
+                  className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900 disabled:bg-slate-400"
+                  disabled={uploading.infographicUrl}
                 >
-                  {editedChallenge.infographicUrl ? "Cambiar" : "Subir"}
+                  {uploading.infographicUrl ? "Subiendo..." : (editedChallenge.infographicUrl ? "Cambiar" : "Subir")}
                 </button>
               </div>
             </div>
@@ -83,9 +94,10 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
                 <input type="file" ref={pdfInputRef} onChange={(e) => handleFileChange(e, 'pdfUrl')} accept="application/pdf" className="hidden" />
                 <button 
                   onClick={() => pdfInputRef.current?.click()}
-                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
+                  disabled={uploading.pdfUrl}
                 >
-                  {editedChallenge.pdfUrl ? "Cambiar PDF" : "Subir PDF"}
+                  {uploading.pdfUrl ? "Subiendo..." : (editedChallenge.pdfUrl ? "Cambiar PDF" : "Subir PDF")}
                 </button>
               </div>
             </div>
