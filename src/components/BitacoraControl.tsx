@@ -7,12 +7,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
-import { SemanalLog, Challenge } from '../types';
+import { SemanalLog, Challenge, LogbookWeekConfig } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 
 interface BitacoraControlProps {
   semanas: Record<number, SemanalLog>;
-  onSaveWeek: (week: number, ph: number, notas: string, fotos?: string[]) => void;
+  onSaveWeek: (week: number, ph: number, notas: string, fotos?: string[], parametros?: Record<string, string | number>) => void;
   selectedWeek: number;
   setSelectedWeek: (week: number) => void;
   readOnly?: boolean;
@@ -28,6 +28,19 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
   challenge,
 }) => {
   const currentLog = semanas[selectedWeek];
+
+  const getWeekConfig = (chal?: Challenge, w?: number): LogbookWeekConfig | undefined => {
+    if (!chal || !chal.cronograma || !w) return undefined;
+    return chal.cronograma.find(c => {
+      if (c.semanas.includes('-')) {
+        const [start, end] = c.semanas.split('-').map(Number);
+        return w >= start && w <= end;
+      }
+      return parseInt(c.semanas, 10) === w;
+    });
+  };
+
+  const weekConfig = getWeekConfig(challenge, selectedWeek);
 
   const chartData = Object.entries(semanas)
     .map(([weekStr, logVal]) => {
@@ -48,6 +61,7 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
   const isUnsafePh = localPh > 5.0;
   const [localNotas, setLocalNotas] = useState<string>(currentLog?.notas ?? '');
   const [localFotos, setLocalFotos] = useState<string[]>(currentLog?.fotos ?? []);
+  const [localParametros, setLocalParametros] = useState<Record<string, string | number>>(currentLog?.parametros ?? {});
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
 
   const handleDownloadChartPNG = async () => {
@@ -80,10 +94,12 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
       setLocalPh(log.ph);
       setLocalNotas(log.notas || '');
       setLocalFotos(log.fotos || []);
+      setLocalParametros(log.parametros || {});
     } else {
       setLocalPh(5.5);
       setLocalNotas('');
       setLocalFotos([]);
+      setLocalParametros({});
     }
   }, [selectedWeek, semanas]);
 
@@ -117,7 +133,7 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
 
   const handleSave = () => {
     if (readOnly) return;
-    onSaveWeek(selectedWeek, localPh, localNotas, localFotos);
+    onSaveWeek(selectedWeek, localPh, localNotas, localFotos, localParametros);
   };
 
   // Process and compress image file
@@ -283,14 +299,20 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
 
       {/* Active Week Form Controls */}
       <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-5 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <span className="inline-flex items-center gap-1 bg-slate-900 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase">
-              Semana {selectedWeek} Activa
+            <span className="inline-flex items-center gap-1 bg-slate-900 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase mb-1.5">
+              Semana {selectedWeek} {weekConfig ? `— Fase: ${weekConfig.fase}` : 'Activa'}
             </span>
-            <h3 className="text-sm font-bold text-slate-800 mt-1">
-              Registro del Punto Crítico de Control (PCC-01)
+            <h3 className="text-sm font-bold text-slate-800">
+              {weekConfig ? weekConfig.accionAlumno : 'Registro del Punto Crítico de Control'}
             </h3>
+            {weekConfig?.puntoCriticoControl && (
+              <p className="text-xs font-semibold text-slate-500 mt-1">
+                <span className="text-red-600 font-bold uppercase mr-1">PCC:</span>
+                {weekConfig.puntoCriticoControl}
+              </p>
+            )}
           </div>
           <div className="text-xs text-slate-400 font-mono">
             {(() => {
@@ -402,6 +424,30 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
             )}
           </div>
         </div>
+
+        {/* Dynamic Parameters from week config */}
+        {weekConfig?.parametrosRegistrar && weekConfig.parametrosRegistrar.length > 0 && (
+          <div className="space-y-4 pt-4 border-t border-slate-200">
+            <h4 className="text-sm font-bold text-slate-800">Parámetros a Registrar (PCC)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {weekConfig.parametrosRegistrar.filter(p => p.toLowerCase() !== 'ph').map((paramName) => (
+                <div key={paramName}>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    {paramName}
+                  </label>
+                  <input
+                    type="text"
+                    disabled={readOnly}
+                    value={localParametros[paramName] || ''}
+                    onChange={(e) => setLocalParametros({ ...localParametros, [paramName]: e.target.value })}
+                    placeholder={`Registrar ${paramName}`}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-transparent transition-all disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Observation text notes */}
         <div className="space-y-2">

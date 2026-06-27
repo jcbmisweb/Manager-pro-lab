@@ -13,6 +13,7 @@ import {
 } from './types';
 import { ConfiguracionInicial } from './components/ConfiguracionInicial';
 import { ProjectDashboard } from './components/ProjectDashboard';
+import { ProjectAdminManager } from './components/ProjectAdminManager';
 import { BitacoraControl } from './components/BitacoraControl';
 import { TasteLabSostenibilidad } from './components/TasteLabSostenibilidad';
 import { ChatMessenger } from './components/ChatMessenger';
@@ -174,8 +175,12 @@ export default function App() {
   const [activeLabTab, setActiveLabTab] = useState<'bitacora' | 'tastelab'>('bitacora');
 
   // Sub-dashboard tab states
-  const [adminTab, setAdminTab] = useState<'ies' | 'aulas' | 'alumnos'>('ies');
+  const [adminTab, setAdminTab] = useState<'ies' | 'aulas' | 'alumnos' | 'proyectos'>('ies');
   const [activeCatalogId, setActiveCatalogId] = useState<string | null>(null);
+
+  // Project Admin States
+  const [challengesState, setChallengesState] = useState<Challenge[]>(CHALLENGES);
+  const [managingChallengeId, setManagingChallengeId] = useState<string | null>(null);
 
   // Infographic visibility option per challenge item (Requirement 5)
   const [showInfographics, setShowInfographics] = useState<Record<string, boolean>>({});
@@ -558,7 +563,7 @@ export default function App() {
       return;
     }
 
-    const challenge = CHALLENGES.find(c => c.id === challengeId);
+    const challenge = challengesState.find(c => c.id === challengeId);
     if (!challenge) return;
 
     // Create default week records
@@ -606,7 +611,7 @@ export default function App() {
   const handleResetExperiment = () => {
     const currentProj = proyectos.find(p => p.id === openProyectoId);
     if (!currentProj) return;
-    const challenge = CHALLENGES.find(c => c.id === currentProj.challengeId);
+    const challenge = challengesState.find(c => c.id === currentProj.challengeId);
     if (!challenge) return;
 
     const resetSemanas: Record<number, SemanalLog> = {};
@@ -631,7 +636,7 @@ export default function App() {
   };
 
   // Save week details
-  const handleSaveWeek = (week: number, ph: number, notas: string, fotos?: string[]) => {
+  const handleSaveWeek = (week: number, ph: number, notas: string, fotos?: string[], parametros?: Record<string, string | number>) => {
     const currentProj = proyectos.find(p => p.id === openProyectoId);
     if (!currentProj) return;
     
@@ -642,7 +647,8 @@ export default function App() {
       notas,
       completado: true,
       fechaRegistro: new Date().toISOString(),
-      fotos: fotos || []
+      fotos: fotos || [],
+      parametros: parametros || {}
     };
     
     updateDoc(doc(db, "proyectos", currentProj.id), {
@@ -668,7 +674,7 @@ export default function App() {
   // V. COMPUTED VIEWS HELPERS
   // ----------------------------------------------------
   const activeProject = proyectos.find(p => p.id === openProyectoId);
-  const activeChallenge = activeProject ? CHALLENGES.find(c => c.id === activeProject.challengeId) : null;
+  const activeChallenge = activeProject ? challengesState.find(c => c.id === activeProject.challengeId) : null;
 
   // Find conversations and unread counts for messenger alert
   const unreadMessagesCount = user ? 
@@ -1021,6 +1027,16 @@ export default function App() {
                         >
                           Gestión de Alumnos y Roles
                         </button>
+                        <button
+                          onClick={() => setAdminTab('proyectos')}
+                          className={`pb-2.5 text-xs font-bold px-1.5 transition-all border-b-2 cursor-pointer ${
+                            adminTab === 'proyectos'
+                              ? 'border-red-600 text-slate-900'
+                              : 'border-transparent text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Proyectos
+                        </button>
                       </div>
 
                       <div className="pt-6">
@@ -1263,6 +1279,80 @@ export default function App() {
                           </div>
                         )}
 
+                        {/* Tab A.4: PROYECTOS */}
+                        {adminTab === 'proyectos' && (
+                          <div className="space-y-4">
+                            {managingChallengeId ? (
+                              <ProjectAdminManager 
+                                challenge={challengesState.find(c => c.id === managingChallengeId)!} 
+                                onClose={() => setManagingChallengeId(null)}
+                                onSave={(updatedChallenge) => {
+                                  setChallengesState(prev => prev.map(c => c.id === updatedChallenge.id ? updatedChallenge : c));
+                                  setManagingChallengeId(null);
+                                }}
+                              />
+                            ) : (
+                              <>
+                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-2">
+                                  Gestión de Proyectos y Retos
+                                </h3>
+                                <p className="text-xs text-slate-600 mb-4">
+                                  Configura la visibilidad de los proyectos (retos) para que aparezcan o no a los alumnos. 
+                                  Aquí también podrás gestionar la ficha técnica de cocina, receta y cuaderno de bitácora.
+                                </p>
+                                
+                                <div className="space-y-6">
+                                  {['A', 'B', 'C'].map(block => (
+                                    <div key={block} className="border border-slate-200 rounded-xl overflow-hidden">
+                                      <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                                        <h4 className="font-bold text-slate-800 text-sm">Bloque {block}</h4>
+                                      </div>
+                                      <div className="p-4 space-y-3">
+                                        {challengesState.filter(c => c.bloque === block).map(c => (
+                                          <div key={c.id} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+                                            <div>
+                                              <div className="font-bold text-slate-800 text-sm">{c.code}: {c.name}</div>
+                                              <div className="text-xs text-slate-500 mt-1">
+                                                Estado: <span className={`font-semibold ${c.isPublished ? 'text-green-600' : 'text-amber-600'}`}>
+                                                  {c.isPublished ? 'Publicado (Visible)' : 'Borrador (Oculto)'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <label className="flex items-center gap-2 cursor-pointer">
+                                                <div className="relative">
+                                                  <input 
+                                                    type="checkbox" 
+                                                    className="sr-only" 
+                                                    checked={!!c.isPublished}
+                                                    onChange={() => {
+                                                      setChallengesState(prev => prev.map(ch => ch.id === c.id ? { ...ch, isPublished: !ch.isPublished } : ch))
+                                                    }}
+                                                  />
+                                                  <div className={`block w-10 h-6 rounded-full transition-colors ${c.isPublished ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                                                  <div className={`dot absolute top-1 bg-white w-4 h-4 rounded-full transition-transform ${c.isPublished ? 'left-5' : 'left-1'}`}></div>
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-600 uppercase">Publicar</span>
+                                              </label>
+                                              
+                                              <button 
+                                                onClick={() => setManagingChallengeId(c.id)}
+                                                className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-bold uppercase hover:bg-blue-100 transition-colors"
+                                              >
+                                                Gestionar
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
                       </div>
 
                     </div>
@@ -1440,7 +1530,7 @@ export default function App() {
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {proyectos.filter(p => p.alumnoId === user.id).map(p => {
-                            const chal = CHALLENGES.find(c => c.id === p.challengeId);
+                            const chal = challengesState.find(c => c.id === p.challengeId);
                             const compWeeks = Object.values(p.semanas).filter((w: any) => w.completado).length;
                             const totalWeeks = Object.keys(p.semanas).length;
 
@@ -1516,7 +1606,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <ProjectDashboard />
+                      <ProjectDashboard challenges={challengesState} onStartProject={handleStartProject} />
                     </div>
 
                   </div>

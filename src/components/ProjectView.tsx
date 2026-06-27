@@ -1,147 +1,172 @@
-import React, { useState, useEffect } from 'react';
-import { Challenge, Project } from '../types';
-import { Bitacora } from './Bitacora';
-import { collection, addDoc, query, where, getDocs, limit, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import React from 'react';
+import { Challenge } from '../types';
 
 interface ProjectViewProps {
   challenge: Challenge;
   onClose: () => void;
+  onStartProject?: (challengeId: string, title: string) => void;
 }
 
-export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'ficha' | 'bitacora'>('ficha');
-  const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!challenge?.id) {
-      setLoading(false);
-      return;
-    }
-    const fetchProject = async () => {
-      try {
-        const q = query(collection(db, 'projects'), where('challengeId', '==', challenge.id), limit(1));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const doc = querySnapshot.docs[0];
-          setActiveProject({ id: doc.id, ...doc.data() } as Project);
-        }
-      } catch (err) {
-        console.error("Error fetching project:", err);
-      }
-      setLoading(false);
-    };
-    fetchProject();
-  }, [challenge?.id]);
-
-  const handleStartProject = async () => {
-    if (!challenge) return;
-    setIsCreating(true);
-    const newProject: Omit<Project, 'id'> = {
-      challengeId: challenge.id,
-      block: challenge.bloque,
-      title: `Lote: ${challenge.name}`,
-      objectives: [challenge.scientificObjective, challenge.sustainableObjective],
-      technicalData: { "Variable": challenge.investigationVariable },
-      infographicUrl: '',
-      status: 'en curso'
-    };
-    
-    try {
-      const docRef = await addDoc(collection(db, 'projects'), newProject);
-      setActiveProject({ ...newProject, id: docRef.id });
-      setActiveTab('bitacora');
-    } catch (err) {
-      console.error("Error creating project:", err);
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleToggleStatus = async () => {
-    if (!activeProject) return;
-    const newStatus = activeProject.status === 'en curso' ? 'completado' : 'en curso';
-    try {
-      await updateDoc(doc(db, 'projects', activeProject.id), { status: newStatus });
-      setActiveProject({ ...activeProject, status: newStatus });
-    } catch (err) {
-      console.error("Error updating status:", err);
-    }
-  };
-
+export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, onStartProject }) => {
   return (
-    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-      <div className="p-6">
-        <button onClick={onClose} className="mb-4 text-sm text-slate-500 hover:text-slate-800">
-          ← Volver al Dashboard
-        </button>
-        <h1 className="text-3xl font-bold mb-4">{challenge.name}</h1>
+    <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto p-4 sm:p-8">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         
-        <div className="flex gap-4 border-b mb-6">
-          <button 
-            onClick={() => setActiveTab('ficha')}
-            className={`pb-2 text-sm font-semibold ${activeTab === 'ficha' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-500'}`}
-          >
-            Ficha Técnica
-          </button>
-          <button 
-            onClick={() => setActiveTab('bitacora')}
-            disabled={!activeProject}
-            className={`pb-2 text-sm font-semibold ${activeTab === 'bitacora' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-500'} ${!activeProject ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Cuaderno de Bitácora
+        {/* Header */}
+        <div className="p-6 sm:p-8 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{challenge.code}</span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{challenge.name}</h1>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+            ✕
           </button>
         </div>
 
-        {activeTab === 'ficha' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="font-bold text-sm text-slate-700 uppercase mb-2">Descripción</h3>
-              <p className="text-sm text-slate-600 mb-4">{challenge.description}</p>
-              
-              <h3 className="font-bold text-sm text-slate-700 uppercase mb-2">Objetivos</h3>
-              <ul className="list-disc pl-5 text-sm text-slate-600 mb-4">
-                <li>Científico: {challenge.scientificObjective}</li>
-                <li>Sostenible: {challenge.sustainableObjective}</li>
-              </ul>
-              <h3 className="font-bold text-sm text-slate-700 uppercase mb-2">Variables</h3>
-              <p className="text-sm text-slate-600">Variable de investigación: {challenge.investigationVariable}</p>
-              
-              {activeProject && (
-                <div className="mt-4 p-3 bg-slate-100 rounded border">
-                  <p className="text-sm font-semibold text-slate-800">Estado: {activeProject.status}</p>
-                  <button onClick={handleToggleStatus} className="mt-2 text-xs text-emerald-600 font-bold uppercase underline">
-                    {activeProject.status === 'en curso' ? 'Marcar como Completado' : 'Reabrir Proyecto'}
-                  </button>
-                </div>
-              )}
-              
-              {!activeProject && !loading && (
-                <button 
-                  onClick={handleStartProject}
-                  disabled={isCreating}
-                  className="mt-4 bg-emerald-600 text-white px-4 py-2 rounded font-semibold"
-                >
-                  {isCreating ? 'Iniciando...' : 'Iniciar Reto'}
-                </button>
-              )}
-              {loading && <p className="text-sm text-slate-500 mt-4">Cargando estado del reto...</p>}
-            </div>
-            <div>
-              <div className="bg-slate-100 p-8 rounded-lg text-center text-slate-500">
-                  Visualizador de infografía (Pendiente de implementación real)
+        <div className="p-6 sm:p-8 space-y-8">
+          
+          {/* 1. Estructura de Reto */}
+          <section className="space-y-4">
+            <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">1. Ficha del Proyecto</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2">Objetivo Sostenible</h3>
+                <p className="text-sm text-emerald-900 leading-relaxed">{challenge.sustainableObjective}</p>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <h3 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-2">Reto Técnico (Variable)</h3>
+                <p className="text-sm text-blue-900 leading-relaxed">{challenge.investigationVariable}</p>
               </div>
             </div>
+            {challenge.description && (
+              <p className="text-sm text-slate-600 mt-2 italic">{challenge.description}</p>
+            )}
+          </section>
+
+          {/* 2. Insumos Base */}
+          {challenge.insumosBase && challenge.insumosBase.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">2. Insumos Base</h2>
+              <div className="space-y-6">
+                {challenge.insumosBase.map((insumo, idx) => (
+                  <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-100 px-4 py-2 border-b border-slate-200">
+                      <h3 className="font-bold text-slate-800">{insumo.titulo}</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Ingredientes</h4>
+                        <ul className="space-y-2">
+                          {insumo.ingredientes.map(ing => (
+                            <li key={ing.id} className="text-sm text-slate-700 flex justify-between border-b border-slate-100 pb-1">
+                              <span>{ing.nombre} {ing.notas && <span className="text-xs text-slate-400 italic ml-1">({ing.notas})</span>}</span>
+                              <span className="font-bold">{ing.cantidad}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Procedimiento</h4>
+                        <ol className="list-decimal pl-4 space-y-2 text-sm text-slate-700">
+                          {insumo.pasos.map(paso => (
+                            <li key={paso.id}>{paso.descripcion}</li>
+                          ))}
+                        </ol>
+                        {insumo.mantenimiento && (
+                          <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                            <h5 className="text-xs font-bold text-amber-800 uppercase mb-1">Mantenimiento</h5>
+                            <p className="text-xs text-amber-900">{insumo.mantenimiento}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 3. Elaboración Principal */}
+          {challenge.elaboracionPrincipal && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">3. Elaboración Principal</h2>
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                <div className="bg-slate-800 px-4 py-2 border-b border-slate-900">
+                  <h3 className="font-bold text-white">{challenge.elaboracionPrincipal.titulo}</h3>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Materia Prima</h4>
+                    <ul className="space-y-2">
+                      {challenge.elaboracionPrincipal.ingredientes.map(ing => (
+                        <li key={ing.id} className="text-sm text-slate-700 flex justify-between border-b border-slate-200 pb-1">
+                          <span>{ing.nombre}</span>
+                          <span className="font-bold">{ing.cantidad}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Montaje</h4>
+                    <ol className="list-decimal pl-4 space-y-2 text-sm text-slate-700">
+                      {challenge.elaboracionPrincipal.pasos.map(paso => (
+                        <li key={paso.id}>{paso.descripcion}</li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 4. Cronograma */}
+          {challenge.cronograma && challenge.cronograma.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">4. Cronograma y Monitorización</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-300">
+                      <th className="p-3 font-bold text-slate-700">Fase</th>
+                      <th className="p-3 font-bold text-slate-700 text-center">Semana</th>
+                      <th className="p-3 font-bold text-slate-700">Acción del Alumno</th>
+                      <th className="p-3 font-bold text-slate-700">PCC (Punto Crítico)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {challenge.cronograma.map((fase) => (
+                      <tr key={fase.id} className="border-b border-slate-200 hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-800 align-top">{fase.fase}</td>
+                        <td className="p-3 text-slate-600 align-top text-center font-mono bg-slate-50">{fase.semanas}</td>
+                        <td className="p-3 text-slate-600 align-top">{fase.accionAlumno}</td>
+                        <td className="p-3 text-red-600 font-medium align-top">{fase.puntoCriticoControl}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+          
+          {/* Action Footer */}
+          <div className="pt-8 flex justify-end gap-4 border-t border-slate-200">
+            <button onClick={onClose} className="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+              Cancelar
+            </button>
+            {onStartProject && (
+              <button 
+                onClick={() => {
+                  onStartProject(challenge.id, `Proyecto: ${challenge.name}`);
+                  onClose();
+                }}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold transition-all shadow-md flex items-center gap-2"
+              >
+                <span>🚀</span> Iniciar Laboratorio
+              </button>
+            )}
           </div>
-        ) : activeProject ? (
-          <Bitacora projectId={activeProject.id} />
-        ) : (
-          <div className="text-slate-600">
-            <p>Debes iniciar el reto para acceder al cuaderno de bitácora.</p>
-          </div>
-        )}
+          
+        </div>
       </div>
     </div>
   );

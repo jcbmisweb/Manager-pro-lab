@@ -4,12 +4,13 @@
  */
 
 export interface SemanalLog {
-  ph: number;
+  ph: number; // Keep for legacy / graphing
   completado: boolean;
   notes?: string; // Support both notes and notas safely
   notas: string;
   fechaRegistro?: string;
   fotos?: string[]; // Array of compressed Base64 images
+  parametros?: Record<string, string | number>; // Dynamically track values from Challenge config
 }
 
 export interface IESConfig {
@@ -71,6 +72,36 @@ export interface RetoState {
 
 
 
+export interface KitchenIngredient {
+  id: string;
+  nombre: string;
+  cantidad: string;
+  notas?: string;
+}
+
+export interface KitchenStep {
+  id: string;
+  orden: number;
+  descripcion: string;
+}
+
+export interface KitchenRecipeSheet {
+  titulo: string;
+  ingredientes: KitchenIngredient[];
+  pasos: KitchenStep[];
+  mantenimiento?: string;
+}
+
+export interface LogbookWeekConfig {
+  id: string;
+  fase: string;
+  semanas: string;
+  accionAlumno: string;
+  puntoCriticoControl: string;
+  requiereFoto: boolean;
+  parametrosRegistrar: string[];
+}
+
 export interface Challenge {
   id: string;
   code: string;
@@ -90,6 +121,10 @@ export interface Challenge {
   phInicialDefault: number;
   phFinalEsperado: number;
   bloque: 'A' | 'B' | 'C';
+  isPublished?: boolean;
+  insumosBase?: KitchenRecipeSheet[];
+  elaboracionPrincipal?: KitchenRecipeSheet;
+  cronograma?: LogbookWeekConfig[];
 }
 
 export const MODULO_INFO = {
@@ -103,23 +138,64 @@ export const MODULO_INFO = {
 export const CHALLENGES: Challenge[] = [
   {
     id: 'reto-01a',
-    code: 'RETO 01-A',
-    name: 'Queso de Soya Biológicamente Acidificado',
+    code: 'Reto 01',
+    name: 'Queso de Anacardos Fermentado con Kéfir de Agua',
     emoji: '🧀',
     gradient: 'from-amber-500 to-orange-600',
-    description: 'Sustitución de ácidos químicos por inoculación de bacterias ácido-lácticas en bebida de soya para coagulación biológica controlada.',
-    scientificObjective: 'Lograr una coagulación estable a un pH crítico de 4.4 controlando la sinéresis sin adición de sales sintéticas.',
-    sustainableObjective: 'Reducción de huella hídrica en un 80% frente al queso tradicional de origen animal y valorización de subproductos lácteos sustitutos.',
-    investigationVariable: 'Relación de inóculo de bacterias lácticas frente a la velocidad de acidificación del gel y la firmeza organoléptica final.',
-    initialWeightDefault: 200,
-    inoculantOptions: ['Re-siembra de lote anterior', 'Cápsula comercial de probióticos'],
-    materiaPrimaLabel: 'Granos de soya / Bebida base',
-    precioMateriaPrimaKilo: 4.5,
-    precioComercialKilo: 18.5,
+    description: 'Alternativa láctea de alta gama utilizando anacardos y un SCOBY casero (kéfir de agua).',
+    scientificObjective: 'Lograr una coagulación estable a un pH crítico de 4.4.', // keeping for legacy
+    sustainableObjective: 'Crear una alternativa láctea de alta gama utilizando anacardos y un SCOBY casero (kéfir de agua), eliminando la dependencia de cultivos industriales y reduciendo el desperdicio mediante el aprovechamiento de los nódulos excedentes.',
+    investigationVariable: 'Comparar la velocidad de acidificación y la estabilidad de la textura del queso utilizando kéfir de agua de 48h frente a un queso elaborado con probióticos comerciales.',
+    initialWeightDefault: 400,
+    inoculantOptions: ['Kéfir de agua 48h', 'Probióticos comerciales'],
+    materiaPrimaLabel: 'Anacardos crudos',
+    precioMateriaPrimaKilo: 12.5,
+    precioComercialKilo: 28.5,
     semanaMax: 8,
-    phInicialDefault: 5.5,
-    phFinalEsperado: 4.3,
-    bloque: 'A'
+    phInicialDefault: 6.0,
+    phFinalEsperado: 4.4,
+    bloque: 'A',
+    isPublished: false,
+    insumosBase: [
+      {
+        titulo: 'Kéfir de Agua (El Iniciador)',
+        ingredientes: [
+          { id: 'ing1', nombre: 'Agua filtrada (sin cloro)', cantidad: '1L' },
+          { id: 'ing2', nombre: 'Azúcar moreno', cantidad: '60g' },
+          { id: 'ing3', nombre: 'Cristales de kéfir', cantidad: '30g' },
+          { id: 'ing4', nombre: 'Higos deshidratados', cantidad: '2' },
+          { id: 'ing5', nombre: 'Limón', cantidad: 'rodajas', notas: 'Al gusto' }
+        ],
+        pasos: [
+          { id: 'p1', orden: 1, descripcion: 'Diluir el azúcar en un poco de agua caliente y luego añadir el agua fría.' },
+          { id: 'p2', orden: 2, descripcion: 'Agregar los cristales de kéfir, los higos y el limón.' },
+          { id: 'p3', orden: 3, descripcion: 'Fermentación: Dejar a temperatura ambiente (20-25 °C) durante 48-72 horas en un frasco cubierto con un paño.' },
+          { id: 'p4', orden: 4, descripcion: 'Cosecha: Colar con utensilios de plástico o madera (evitar metal) y reservar el líquido para inocular el queso.' }
+        ],
+        mantenimiento: 'Guardar los granos en agua con un 10% de azúcar en la nevera (máximo 3 semanas).'
+      }
+    ],
+    elaboracionPrincipal: {
+      titulo: 'El Queso',
+      ingredientes: [
+        { id: 'ep1', nombre: 'Anacardos (remojados 8-12h)', cantidad: '400g' },
+        { id: 'ep2', nombre: 'Agua filtrada', cantidad: '100ml' },
+        { id: 'ep3', nombre: 'Kéfir de Agua activo', cantidad: '30ml (2 cucharadas)' }
+      ],
+      pasos: [
+        { id: 'ep_p1', orden: 1, descripcion: 'Triturar los anacardos con el agua hasta obtener una crema suave (no superar los 42 °C para proteger las bacterias lácticas).' },
+        { id: 'ep_p2', orden: 2, descripcion: 'Añadir el kéfir de agua y mezclar brevemente.' },
+        { id: 'ep_p3', orden: 3, descripcion: 'Fermentación Primaria: Reposar en un frasco limpio entre 12 y 24 horas a 25-30 °C hasta que el pH sea inferior a 4.5.' },
+        { id: 'ep_p4', orden: 4, descripcion: 'Maduración: Salar (2% del peso) y porcionar. Se puede deshidratar a 41 °C durante 20 horas para obtener firmeza.' }
+      ]
+    },
+    cronograma: [
+      { id: 'cro1', fase: 'Arranque', semanas: '1', accionAlumno: 'Activar cristales de kéfir e inocular la base de anacardos.', puntoCriticoControl: 'pH < 4.5 (Semáforo Verde)', requiereFoto: true, parametrosRegistrar: ['pH', 'Aspecto'] },
+      { id: 'cro2', fase: 'Moldeo', semanas: '2', accionAlumno: 'Porcionar el queso (aprox. 80g) y realizar el secado inicial.', puntoCriticoControl: 'Olor láctico y ausencia de moho.', requiereFoto: true, parametrosRegistrar: ['Olor', 'Aspecto'] },
+      { id: 'cro3', fase: 'Maduración', semanas: '3-6', accionAlumno: 'Madurar en frío sobre esterilla, volteando cada 2 días.', puntoCriticoControl: 'Semáforo Amarillo: Vigilar levadura Kahm.', requiereFoto: true, parametrosRegistrar: ['pH', 'Olor', 'Aspecto', 'Temperatura'] },
+      { id: 'cro4', fase: 'Afinado', semanas: '7', accionAlumno: 'Evaluación de la textura (firmeza) y persistencia del sabor.', puntoCriticoControl: 'Registro de mermas por evaporación.', requiereFoto: true, parametrosRegistrar: ['Mermas (g)', 'Firmeza'] },
+      { id: 'cro5', fase: 'Evidencia', semanas: '8', accionAlumno: 'Presentación PPP y cata comparativa en el aula.', puntoCriticoControl: 'Conclusión Gastronómica: Uso en plato real.', requiereFoto: true, parametrosRegistrar: ['Análisis Sensorial'] }
+    ]
   },
   {
     id: 'reto-02',
