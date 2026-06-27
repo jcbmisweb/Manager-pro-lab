@@ -79,10 +79,16 @@ export const TasteLabSostenibilidad: React.FC<TasteLabSostenibilidadProps> = ({
     setUniformidad(sensorial?.uniformidad ?? 3);
     setAcidez(sensorial?.acidez ?? 3);
     setPersistencia(sensorial?.persistencia ?? 3);
+  }, [sensorial?.firmeza, sensorial?.uniformidad, sensorial?.acidez, sensorial?.persistencia]);
+
+  useEffect(() => {
     setWeightInput(pesoFinal ? pesoFinal.toString() : '150');
     setShowReport(pesoFinal !== null);
-    setLocalDegustaciones(degustaciones);
-  }, [sensorial, pesoFinal, degustaciones]);
+  }, [pesoFinal]);
+
+  useEffect(() => {
+    setLocalDegustaciones(degustaciones || []);
+  }, [JSON.stringify(degustaciones)]);
 
   const parsedWeight = parseFloat(weightInput) || 0;
 
@@ -719,35 +725,16 @@ export const TasteLabSostenibilidad: React.FC<TasteLabSostenibilidadProps> = ({
               </p>
             </div>
 
-            {/* Stylized pure SVG QR Code */}
-            <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-3xs flex flex-col items-center">
-              <svg className="w-32 h-32 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
-                {/* Quiet Zone boundary */}
-                <rect width="100" height="100" fill="white" />
-                
-                {/* Top Left Marker */}
-                <path d="M5,5 h20 v20 h-20 z M9,9 h12 v12 h-12 z M13,13 h4 v4 h-4 z" />
-                {/* Top Right Marker */}
-                <path d="M75,5 h20 v20 h-20 z M79,9 h12 v12 h-12 z M83,13 h4 v4 h-4 z" />
-                {/* Bottom Left Marker */}
-                <path d="M5,75 h20 v20 h-20 z M9,79 h12 v12 h-12 z M13,83 h4 v4 h-4 z" />
-                
-                {/* Random QR pixels for visual realism */}
-                <path d="M30,5 h4 v4 h-4 z M38,5 h8 v4 h-8 z M50,5 h4 v4 h-4 z M58,5 h12 v4 h-12 z M34,12 h4 v4 h-4 z M46,12 h8 v4 h-8 z M62,12 h4 v4 h-4 z M30,19 h12 v4 h-12 z M46,19 h4 v4 h-4 z M58,19 h8 v4 h-8 z" />
-                <path d="M30,28 h4 v4 h-4 z M42,28 h4 v4 h-4 z M50,28 h12 v4 h-12 z M66,28 h4 v4 h-4 z M78,28 h4 v4 h-4 z M86,28 h8 v4 h-8 z" />
-                <path d="M5,34 h12 v4 h-12 z M25,34 h4 v4 h-4 z M34,34 h8 v4 h-8 z M46,34 h4 v4 h-4 z M54,34 h12 v4 h-12 z M70,34 h4 v4 h-4 z M82,34 h12 v4 h-12 z" />
-                <path d="M5,42 h4 v4 h-4 z M17,42 h4 v4 h-4 z M25,42 h8 v4 h-8 z M38,42 h4 v4 h-4 z M46,42 h12 v4 h-12 z M66,42 h16 v4 h-16 z M86,42 h8 v4 h-8 z" />
-                <path d="M13,50 h12 v4 h-12 z M30,50 h4 v4 h-4 z M38,50 h16 v4 h-16 z M58,50 h8 v4 h-8 z M70,50 h4 v4 h-4 z M78,50 h16 v4 h-16 z" />
-                <path d="M5,58 h8 v4 h-8 z M17,58 h20 v4 h-20 z M42,58 h4 v4 h-4 z M50,58 h8 v4 h-8 z M62,58 h16 v4 h-16 z M82,58 h12 v4 h-12 z" />
-                <path d="M30,66 h12 v4 h-12 z M46,66 h4 v4 h-4 z M54,66 h8 v4 h-8 z M66,66 h4 v4 h-4 z M74,66 h12 v4 h-12 z M90,66 h4 v4 h-4 z" />
-                <path d="M34,74 h4 v4 h-4 z M46,74 h8 v4 h-8 z M58,74 h4 v4 h-4 z M66,74 h8 v4 h-8 z M78,74 h4 v4 h-4 z M86,74 h8 v4 h-8 z" />
-                <path d="M30,82 h8 v4 h-8 z M42,82 h12 v4 h-12 z M58,82 h16 v4 h-16 z M78,82 h4 v4 h-4 z M86,82 h4 v4 h-4 z M94,82 h2 v4 h-2 z" />
-                <path d="M30,90 h16 v4 h-16 z M50,90 h4 v4 h-4 z M58,90 h8 v4 h-8 z M70,90 h12 v4 h-12 z M86,90 h8 v4 h-8 z" />
-                
-                {/* Center bio icon container */}
-                <rect x="42" y="42" width="16" height="16" rx="3" fill="white" stroke="rgb(109, 40, 217)" strokeWidth="1" />
-                <circle cx="50" cy="50" r="4" fill="rgb(109, 40, 217)" />
-              </svg>
+            {/* Dynamic Real QR Code */}
+            <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-3xs flex flex-col items-center justify-center">
+              <div className="w-32 h-32 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-lg overflow-hidden">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
+                  alt="Código QR de la encuesta"
+                  className="w-28 h-28"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
               <span className="block text-[9px] text-slate-400 font-mono mt-2 uppercase tracking-wide">
                 ESCANEO DIRECTO DE AULA
               </span>

@@ -211,7 +211,7 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const guestId = params.get('guestTasting') || params.get('guestReview');
-    if (guestId) {
+    if (guestId && guestProjectId !== guestId) {
       setGuestProjectId(guestId);
       setGuestLoading(true);
       getDoc(doc(db, "proyectos", guestId))
