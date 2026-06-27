@@ -297,7 +297,11 @@ export default function App() {
         if (!snapshot.empty) {
           // Sort them by code or id so they appear in order
           const fetchedChallenges = snapshot.docs.map(doc => doc.data() as Challenge);
-          fetchedChallenges.sort((a, b) => a.id.localeCompare(b.id));
+          fetchedChallenges.sort((a, b) => {
+            const idA = a?.id || '';
+            const idB = b?.id || '';
+            return idA.localeCompare(idB);
+          });
           setChallengesState(fetchedChallenges);
         } else {
           // Seed the initial challenges if empty

@@ -1,10 +1,10 @@
 {
   "projectId": "managerprolab-b5724",
-  "appId": "1:943078975240:web:105f389ea3fbd89d6eaebd",
+  "appId": "1:943078975240:web:3ded2e4ba1bd97206eaebd",
   "apiKey": "AIzaSyDe-IOCpwh1-tgoWyBo91-K-lRmDh6F1ps",
   "authDomain": "managerprolab-b5724.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
+  "firestoreDatabaseId": "ai-studio-copiaexacta25626-5fe3348c-fac5-427c-ab95-c5e8e3b2ea12",
   "storageBucket": "managerprolab-b5724.firebasestorage.app",
   "messagingSenderId": "943078975240",
-  "measurementId": "G-QGPQYP6FZV"
+  "measurementId": ""
 }
