@@ -1237,71 +1237,87 @@ export default function App() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y">
-                                {usuarios.map(u => (
-                                  <tr key={u.id} className="hover:bg-slate-50/50">
-                                    <td className="py-3 font-bold text-slate-800">{u.nombre}</td>
-                                    <td className="py-3 font-mono text-slate-500">{u.correo}</td>
-                                    <td className="py-3">
-                                      <select
-                                        value={u.rol}
-                                        onChange={(e: any) => changeUserRole(u.id, e.target.value)}
-                                        className="text-[10px] p-1 bg-white border rounded text-slate-700 font-bold uppercase cursor-pointer"
-                                      >
-                                        <option value="admin">Admin</option>
-                                        <option value="profesor">Profesor</option>
-                                        <option value="alumno">Alumno</option>
-                                      </select>
-                                    </td>
-                                    <td className="py-3">
-                                      {u.rol === 'alumno' ? (
+                                {usuarios.map(u => {
+                                  let rowClasses = "transition-colors ";
+                                  if (u.rol === 'admin') {
+                                    rowClasses += "bg-orange-50 hover:bg-orange-100";
+                                  } else if (u.rol === 'alumno') {
+                                    rowClasses += u.aulaId ? "bg-emerald-50 hover:bg-emerald-100" : "bg-emerald-100 hover:bg-emerald-200";
+                                  } else if (u.rol === 'profesor') {
+                                    const isAssigned = aulas.some(a => a.profesorId === u.id);
+                                    rowClasses += isAssigned ? "bg-blue-50 hover:bg-blue-100" : "bg-blue-100 hover:bg-blue-200";
+                                  }
+
+                                  return (
+                                    <tr key={u.id} className={rowClasses}>
+                                      <td className="py-3 px-2 font-bold text-slate-800">{u.nombre}</td>
+                                      <td className="py-3 px-2 font-mono text-slate-500">{u.correo}</td>
+                                      <td className="py-3 px-2">
                                         <select
-                                          value={u.aulaId || ''}
-                                          onChange={(e) => assignStudentToAula(u.id, e.target.value)}
-                                          className="text-[11px] p-1 bg-white border border-slate-200 rounded text-slate-700 font-semibold"
+                                          value={u.rol}
+                                          onChange={(e: any) => changeUserRole(u.id, e.target.value)}
+                                          className="text-[10px] p-1 bg-white/60 border border-slate-300 rounded text-slate-700 font-bold uppercase cursor-pointer"
                                         >
-                                          <option value="">-- Sin asignar --</option>
-                                          {aulas.map(a => (
-                                            <option key={a.id} value={a.id}>{a.nombre}</option>
-                                          ))}
+                                          <option value="admin">Admin</option>
+                                          <option value="profesor">Profesor</option>
+                                          <option value="alumno">Alumno</option>
                                         </select>
-                                      ) : (
-                                        <span className="text-slate-400 italic text-[11px]">No aplica</span>
-                                      )}
-                                    </td>
-                                    <td className="py-3">
-                                      <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                                        u.estado === 'activo'
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                          : u.estado === 'bloqueado'
-                                          ? 'bg-red-50 text-red-700 border border-red-100'
-                                          : u.estado === 'eliminado'
-                                          ? 'bg-slate-100 text-slate-500 border border-slate-200'
-                                          : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                      }`}>
-                                        {u.estado}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 text-right flex items-center justify-end gap-1.5">
-                                      <select
-                                        value={u.estado}
-                                        onChange={(e: any) => changeUserStatus(u.id, e.target.value)}
-                                        className="text-[10px] p-1 bg-white border rounded text-slate-700 font-bold uppercase cursor-pointer"
-                                      >
-                                        <option value="activo">Activo</option>
-                                        <option value="bloqueado">Bloqueado</option>
-                                        <option value="suspendido">Suspendido</option>
-                                        <option value="eliminado">Eliminado</option>
-                                      </select>
-                                      <button
-                                        onClick={() => deleteUser(u.id)}
-                                        title="Eliminar permanentemente"
-                                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded transition-colors cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
+                                      </td>
+                                      <td className="py-3 px-2">
+                                        {u.rol === 'alumno' ? (
+                                          <select
+                                            value={u.aulaId || ''}
+                                            onChange={(e) => assignStudentToAula(u.id, e.target.value)}
+                                            className="text-[11px] p-1 bg-white/60 border border-slate-300 rounded text-slate-700 font-semibold"
+                                          >
+                                            <option value="">-- Sin asignar --</option>
+                                            {aulas.map(a => (
+                                              <option key={a.id} value={a.id}>{a.nombre}</option>
+                                            ))}
+                                          </select>
+                                        ) : (u.rol === 'profesor' || u.rol === 'admin') ? (
+                                          <span className="text-slate-500 font-semibold text-[11px]">
+                                            {aulas.filter(a => a.profesorId === u.id).map(a => a.nombre).join(', ') || <span className="italic">Sin asignar</span>}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-400 italic text-[11px]">No aplica</span>
+                                        )}
+                                      </td>
+                                      <td className="py-3 px-2">
+                                        <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                          u.estado === 'activo'
+                                            ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200'
+                                            : u.estado === 'bloqueado'
+                                            ? 'bg-red-100/50 text-red-700 border border-red-200'
+                                            : u.estado === 'eliminado'
+                                            ? 'bg-slate-100/50 text-slate-500 border border-slate-200'
+                                            : 'bg-amber-100/50 text-amber-700 border border-amber-200'
+                                        }`}>
+                                          {u.estado}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-2 text-right flex items-center justify-end gap-1.5">
+                                        <select
+                                          value={u.estado}
+                                          onChange={(e: any) => changeUserStatus(u.id, e.target.value)}
+                                          className="text-[10px] p-1 bg-white/60 border border-slate-300 rounded text-slate-700 font-bold uppercase cursor-pointer"
+                                        >
+                                          <option value="activo">Activo</option>
+                                          <option value="bloqueado">Bloqueado</option>
+                                          <option value="suspendido">Suspendido</option>
+                                          <option value="eliminado">Eliminado</option>
+                                        </select>
+                                        <button
+                                          onClick={() => deleteUser(u.id)}
+                                          title="Eliminar permanentemente"
+                                          className="p-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
