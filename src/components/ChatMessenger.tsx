@@ -44,37 +44,42 @@ export function ChatMessenger({ currentUser, usuarios, aulas, proyectos }: ChatM
 
   // Determine classroom/group possibilities for a given contact
   const getContactAula = (c: Usuario): Aula | undefined => {
-    if (c.rol === 'alumno' && c.aulaId) {
-      return aulas.find(a => a.id === c.aulaId);
+    if (currentUser.role === 'alumno' && currentUser.aulaId) {
+      return aulas.find(a => a.id === currentUser.aulaId);
     }
-    if (c.rol === 'profesor') {
-      if (currentUser.role === 'alumno' && currentUser.aulaId) {
-        const myAula = aulas.find(a => a.id === currentUser.aulaId);
-        if (myAula && myAula.profesorId === c.id) {
-          return myAula;
-        }
-      }
-      return aulas.find(a => a.profesorId === c.id);
+    if (currentUser.role === 'profesor' && c.rol === 'alumno' && c.aulaId) {
+      return aulas.find(a => a.id === c.aulaId && a.profesorId === currentUser.id);
     }
     return undefined;
   };
 
-  // List of contacts current user can message
+  // List of contacts current user can message (restricted strictly to those belonging to the user's classroom)
   const contacts = usuarios.filter(u => {
     if (u.id === currentUser.id || u.estado === 'eliminado') return false;
 
     if (currentUser.role === 'alumno') {
-      if (u.rol === 'profesor') {
-        const studentAula = aulas.find(a => a.id === currentUser.aulaId);
-        return studentAula ? studentAula.profesorId === u.id : true;
+      if (!currentUser.aulaId) return false;
+      const studentAula = aulas.find(a => a.id === currentUser.aulaId);
+      if (!studentAula) return false;
+
+      // Classmates (students in the same classroom)
+      if (u.rol === 'alumno' && u.aulaId === currentUser.aulaId) {
+        return true;
       }
-      return u.rol === 'admin';
+      // The teacher assigned to this classroom
+      if (u.rol === 'profesor' && u.id === studentAula.profesorId) {
+        return true;
+      }
+      return false;
     } else if (currentUser.role === 'profesor') {
-      if (u.rol === 'alumno') {
-        const myAssignedAulaIds = aulas.filter(a => a.profesorId === currentUser.id).map(a => a.id);
-        return u.aulaId ? myAssignedAulaIds.includes(u.aulaId) : false;
+      const myAssignedAulaIds = aulas.filter(a => a.profesorId === currentUser.id).map(a => a.id);
+      if (myAssignedAulaIds.length === 0) return false;
+
+      // Students belonging to any of the teacher's classrooms
+      if (u.rol === 'alumno' && u.aulaId && myAssignedAulaIds.includes(u.aulaId)) {
+        return true;
       }
-      return u.rol === 'admin';
+      return false;
     } else {
       // Admins can see and chat with anyone
       return true;

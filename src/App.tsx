@@ -599,6 +599,10 @@ export default function App() {
     updateDoc(doc(db, "usuarios", studentId), { aulaId }).catch(console.error);
   };
 
+  const assignAulaToProfessor = (aulaId: string, profesorId: string) => {
+    updateDoc(doc(db, "aulas", aulaId), { profesorId }).catch(console.error);
+  };
+
   // Create classrooms
   const handleCrearAula = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1508,8 +1512,19 @@ export default function App() {
                                   <div key={a.id} className="border border-slate-200 p-4 rounded-xl flex justify-between items-center bg-white shadow-3xs">
                                     <div>
                                       <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wide">{a.nombre}</h4>
-                                      <p className="text-[10px] text-slate-500 mt-1">
-                                        Profesor: <span className="font-semibold">{prof?.nombre || 'No asignado'}</span> • {studentsCount} Alumnos inscritos
+                                      <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                                        <span>Profesor a cargo:</span>
+                                        <select
+                                          value={a.profesorId || ''}
+                                          onChange={(e) => assignAulaToProfessor(a.id, e.target.value)}
+                                          className="text-[10px] px-1 py-0.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-700 cursor-pointer"
+                                        >
+                                          <option value="">-- Sin asignar --</option>
+                                          {usuarios.filter(u => u.rol === 'profesor' || u.rol === 'admin').map(p => (
+                                            <option key={p.id} value={p.id}>{p.nombre}</option>
+                                          ))}
+                                        </select>
+                                        <span>• {studentsCount} Alumnos inscritos</span>
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1587,9 +1602,43 @@ export default function App() {
                                             ))}
                                           </select>
                                         ) : (u.rol === 'profesor' || u.rol === 'admin') ? (
-                                          <span className="text-slate-500 font-semibold text-[11px]">
-                                            {aulas.filter(a => a.profesorId === u.id).map(a => a.nombre).join(', ') || <span className="italic">Sin asignar</span>}
-                                          </span>
+                                          <div className="flex flex-col gap-1.5 py-1">
+                                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                              {aulas.filter(a => a.profesorId === u.id).map(a => (
+                                                <span key={a.id} className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded-sm">
+                                                  {a.nombre}
+                                                  <button
+                                                    onClick={() => {
+                                                      if (window.confirm(`¿Quitar aula "${a.nombre}" de este profesor?`)) {
+                                                        assignAulaToProfessor(a.id, "");
+                                                      }
+                                                    }}
+                                                    className="text-blue-500 hover:text-blue-800 font-extrabold cursor-pointer text-[10px] ml-0.5"
+                                                    title="Quitar asignación"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </span>
+                                              ))}
+                                              {aulas.filter(a => a.profesorId === u.id).length === 0 && (
+                                                <span className="text-slate-400 italic text-[10px]">Sin aulas asignadas</span>
+                                              )}
+                                            </div>
+                                            <select
+                                              value=""
+                                              onChange={(e) => {
+                                                if (e.target.value) {
+                                                  assignAulaToProfessor(e.target.value, u.id);
+                                                }
+                                              }}
+                                              className="text-[10px] p-1 bg-white/60 border border-slate-300 rounded text-slate-700 font-semibold max-w-[150px] cursor-pointer"
+                                            >
+                                              <option value="">+ Añadir aula...</option>
+                                              {aulas.filter(a => a.profesorId !== u.id).map(a => (
+                                                <option key={a.id} value={a.id}>{a.nombre}</option>
+                                              ))}
+                                            </select>
+                                          </div>
                                         ) : (
                                           <span className="text-slate-400 italic text-[11px]">No aplica</span>
                                         )}
