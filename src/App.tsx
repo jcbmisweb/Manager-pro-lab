@@ -1444,6 +1444,24 @@ export default function App() {
                                     </div>
                                   ))}
                                 </div>
+                                <div className="mt-8 bg-slate-800 p-6 rounded-xl border border-slate-700">
+                                  <h2 className="text-xl font-bold mb-6 text-emerald-400">Proyectos de Alumnos</h2>
+                                  <div className="space-y-4">
+                                    {proyectos.length > 0 ? (
+                                      proyectos.map(p => (
+                                        <div key={p.id} className="bg-slate-900 p-4 rounded-lg flex justify-between items-center border border-slate-700">
+                                          <div>
+                                            <div className="font-semibold text-white">{p.nombre}</div>
+                                            <div className="text-xs text-slate-400">Alumno: {p.alumnoId} | Reto: {p.challengeId}</div>
+                                          </div>
+                                          <button className="text-xs bg-emerald-600 px-3 py-1 rounded hover:bg-emerald-700 text-white">Gestionar</button>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <p className="text-slate-400 italic">No hay proyectos registrados.</p>
+                                    )}
+                                  </div>
+                                </div>
                               </>
                             )}
                           </div>
