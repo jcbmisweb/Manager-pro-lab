@@ -1,7 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Challenge } from '../types';
-import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ProjectAdminManagerProps {
   challenge: Challenge;
@@ -11,29 +9,6 @@ interface ProjectAdminManagerProps {
 
 export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challenge, onClose, onSave }) => {
   const [editedChallenge, setEditedChallenge] = useState<Challenge>(challenge);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'infographicUrl' | 'pdfUrl') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      console.log(`Subiendo archivo: ${file.name} para campo ${field}, tamaño: ${file.size} bytes`);
-      setUploading(prev => ({ ...prev, [field]: true }));
-      try {
-        const storageRef = ref(storage, `challenges/${editedChallenge.id}/${field}/${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(snapshot.ref);
-        console.log(`Subida exitosa: ${downloadUrl}`);
-        setEditedChallenge({...editedChallenge, [field]: downloadUrl});
-      } catch (error) {
-        console.error("Error uploading file:", error);
-        alert("Error al subir el archivo: " + (error as Error).message);
-      } finally {
-        setUploading(prev => ({ ...prev, [field]: false }));
-      }
-    }
-  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 flex flex-col h-[80vh]">
@@ -54,54 +29,32 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
       
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         
-        {/* Infografía y PDF */}
+        {/* Infografía y PDF - Ahora con enlaces de Drive */}
         <section className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Documentación del Proyecto</h3>
+          <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Documentación del Proyecto (Enlaces Drive)</h3>
           <div className="flex gap-4">
             {/* Infografía */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600">Infografía</label>
-              <div className="flex items-center gap-4">
-                {editedChallenge.infographicUrl ? (
-                  <img src={editedChallenge.infographicUrl} alt="Infografía" className="w-32 h-32 object-cover rounded-lg border border-slate-300" />
-                ) : (
-                  <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
-                    Sin imagen
-                  </div>
-                )}
-                <input type="file" ref={fileInputRef} onChange={(e) => handleFileChange(e, 'infographicUrl')} accept="image/*" className="hidden" />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900 disabled:bg-slate-400"
-                  disabled={uploading.infographicUrl}
-                >
-                  {uploading.infographicUrl ? "Subiendo..." : (editedChallenge.infographicUrl ? "Cambiar" : "Subir")}
-                </button>
-              </div>
+            <div className="space-y-2 flex-1">
+              <label className="text-xs font-bold text-slate-600">URL Infografía</label>
+              <input 
+                type="text"
+                value={editedChallenge.infographicUrl || ''}
+                onChange={e => setEditedChallenge({...editedChallenge, infographicUrl: e.target.value})}
+                placeholder="https://drive.google.com/..."
+                className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             {/* PDF */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600">Ficha PDF</label>
-              <div className="flex items-center gap-4">
-                {editedChallenge.pdfUrl ? (
-                  <div className="w-32 h-32 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center text-blue-800 text-xs font-bold">
-                    PDF Cargado
-                  </div>
-                ) : (
-                  <div className="w-32 h-32 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs">
-                    Sin archivo
-                  </div>
-                )}
-                <input type="file" ref={pdfInputRef} onChange={(e) => handleFileChange(e, 'pdfUrl')} accept="application/pdf" className="hidden" />
-                <button 
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
-                  disabled={uploading.pdfUrl}
-                >
-                  {uploading.pdfUrl ? "Subiendo..." : (editedChallenge.pdfUrl ? "Cambiar PDF" : "Subir PDF")}
-                </button>
-              </div>
+            <div className="space-y-2 flex-1">
+              <label className="text-xs font-bold text-slate-600">URL Ficha PDF</label>
+              <input 
+                type="text"
+                value={editedChallenge.pdfUrl || ''}
+                onChange={e => setEditedChallenge({...editedChallenge, pdfUrl: e.target.value})}
+                placeholder="https://drive.google.com/..."
+                className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           </div>
         </section>
