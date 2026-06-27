@@ -572,10 +572,13 @@ export default function App() {
 
   // Student Project initiation
   const handleStartProject = (challengeId: string, title: string) => {
-    if (!user || user.role !== 'alumno') return;
+    if (!user) {
+      alert("Inicia sesión para iniciar un proyecto.");
+      return;
+    }
     
     // Check if classroom is assigned
-    if (!user.aulaId) {
+    if (user.role === 'alumno' && !user.aulaId) {
       alert("Debes tener asignada una clase por el Administrador antes de iniciar un proyecto.");
       return;
     }
@@ -950,7 +953,15 @@ export default function App() {
                     {/* Active Workbench Tab render */}
                     {activeLabTab === 'bitacora' ? (
                       <BitacoraControl
+                        proyectoId={activeProject.id}
                         semanas={activeProject.semanas}
+                        diario={activeProject.diario || []}
+                        onSaveDiarioEntry={(entry) => {
+                          const currentProj = proyectos.find(p => p.id === activeProject.id);
+                          if (!currentProj) return;
+                          const updatedDiario = [...(currentProj.diario || []), entry];
+                          updateDoc(doc(db, "proyectos", currentProj.id), { diario: updatedDiario }).catch(console.error);
+                        }}
                         onSaveWeek={handleSaveWeek}
                         selectedWeek={selectedWeek}
                         setSelectedWeek={setSelectedWeek}

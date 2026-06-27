@@ -3,6 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface DiarioEntry {
+  id: string;
+  fase: number; // corresponds to week/fase
+  fecha: string;
+  notas: string;
+  fotos: string[];
+  skipPh: boolean;
+  ph?: number;
+  parametros?: Record<string, string | number>;
+}
+
 export interface SemanalLog {
   ph: number; // Keep for legacy / graphing
   completado: boolean;

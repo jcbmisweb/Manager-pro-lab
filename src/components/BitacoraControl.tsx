@@ -1,17 +1,15 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Calendar, Save, Info, Image as ImageIcon, Trash2, Camera, Upload, AlertCircle, Download, BookOpen, Plus } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
-import { SemanalLog, Challenge, LogbookWeekConfig } from '../types';
+import { SemanalLog, Challenge, LogbookWeekConfig, DiarioEntry } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 
 interface BitacoraControlProps {
+  proyectoId: string;
   semanas: Record<number, SemanalLog>;
+  diario: DiarioEntry[];
+  onSaveDiarioEntry: (entry: DiarioEntry) => void;
   onSaveWeek: (week: number, ph: number, notas: string, fotos?: string[], parametros?: Record<string, string | number>) => void;
   selectedWeek: number;
   setSelectedWeek: (week: number) => void;
@@ -21,14 +19,14 @@ interface BitacoraControlProps {
 
 export const BitacoraControl: React.FC<BitacoraControlProps> = ({
   semanas,
+  diario,
+  onSaveDiarioEntry,
   onSaveWeek,
   selectedWeek,
   setSelectedWeek,
   readOnly = false,
   challenge,
 }) => {
-  const currentLog = semanas[selectedWeek];
-
   const getWeekConfig = (chal?: Challenge, w?: number): LogbookWeekConfig | undefined => {
     if (!chal || !chal.cronograma || !w) return undefined;
     return chal.cronograma.find(c => {
@@ -42,27 +40,23 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
 
   const weekConfig = getWeekConfig(challenge, selectedWeek);
 
-  const chartData = Object.entries(semanas)
-    .map(([weekStr, logVal]) => {
-      const log = logVal as SemanalLog;
-      const wNum = parseInt(weekStr, 10);
-      return {
-        semana: `Sem ${wNum}`,
-        ph: typeof log?.ph === 'number' ? log.ph : null,
-        completado: log?.completado
-      };
-    })
-    .sort((a, b) => parseInt(a.semana.replace('Sem ', '')) - parseInt(b.semana.replace('Sem ', '')));
+  // Graph data based on daily logs
+  const chartData = useMemo(() => {
+    return diario
+      .filter(d => !d.skipPh && typeof d.ph === 'number')
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+      .map(d => {
+        const date = new Date(d.fecha);
+        return {
+          fechaStr: `${date.getDate()}/${date.getMonth() + 1}`,
+          ph: d.ph,
+          fase: d.fase
+        };
+      });
+  }, [diario]);
 
-  // Local transient states
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [localPh, setLocalPh] = useState<number>(currentLog?.ph ?? 5.5);
-  const isUnsafePh = localPh > 5.0;
-  const [localNotas, setLocalNotas] = useState<string>(currentLog?.notas ?? '');
-  const [localFotos, setLocalFotos] = useState<string[]>(currentLog?.fotos ?? []);
-  const [localParametros, setLocalParametros] = useState<Record<string, string | number>>(currentLog?.parametros ?? {});
-  const [isCompressing, setIsCompressing] = useState<boolean>(false);
 
   const handleDownloadChartPNG = async () => {
     if (!chartContainerRef.current) return;
@@ -87,59 +81,18 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
     }
   };
 
-  // Synchronize local state when selectedWeek or semanas changes
-  useEffect(() => {
-    const log = semanas[selectedWeek];
-    if (log) {
-      setLocalPh(log.ph);
-      setLocalNotas(log.notas || '');
-      setLocalFotos(log.fotos || []);
-      setLocalParametros(log.parametros || {});
-    } else {
-      setLocalPh(5.5);
-      setLocalNotas('');
-      setLocalFotos([]);
-      setLocalParametros({});
-    }
-  }, [selectedWeek, semanas]);
+  // Diario Form State
+  const [showNewEntry, setShowNewEntry] = useState(false);
+  const [skipPh, setSkipPh] = useState(false);
+  const [localPh, setLocalPh] = useState<number>(5.0);
+  const [localNotas, setLocalNotas] = useState<string>('');
+  const [localFotos, setLocalFotos] = useState<string[]>([]);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
 
-  // Compute alert level based on pH
-  const getAlertInfo = (val: number) => {
-    if (val < 4.5) {
-      return {
-        level: 'safe',
-        className: 'status-safe text-emerald-800 bg-emerald-50 border-emerald-200',
-        badge: '🟢 SEGURO',
-        desc: 'Ambiente seguro. Fermentación láctica óptima.'
-      };
-    } else if (val >= 4.5 && val <= 4.6) {
-      return {
-        level: 'warning',
-        className: 'status-warning text-amber-800 bg-amber-50 border-amber-200',
-        badge: '🟡 ALERTA LEVADURA KAHM',
-        desc: 'Presencia o riesgo de Levadura Kahm. Retirar capa superficial, regular la temperatura y optimizar ventilación inmediata.'
-      };
-    } else {
-      return {
-        level: 'danger',
-        className: 'status-danger text-red-800 bg-red-50 border-red-200',
-        badge: '🔴 PELIGRO / DESCARTAR',
-        desc: '¡Alerta de Contaminación Crítica o Moho! pH fuera de rango bactericida. Descartar lote inmediatamente para prevenir patógenos.'
-      };
-    }
-  };
+  const isUnsafePh = !skipPh && localPh > 5.0;
 
-  const alertInfo = getAlertInfo(localPh);
-
-  const handleSave = () => {
-    if (readOnly) return;
-    onSaveWeek(selectedWeek, localPh, localNotas, localFotos, localParametros);
-  };
-
-  // Process and compress image file
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (readOnly || !e.target.files) return;
-    
     setIsCompressing(true);
     const files = Array.from(e.target.files);
     const newPhotos: string[] = [];
@@ -152,40 +105,76 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
           reader.onerror = reject;
           reader.readAsDataURL(file as any);
         });
-
-        // Compress image using canvas utility
         const compressed = await compressImage(base64, 800, 800, 0.7);
         newPhotos.push(compressed);
       } catch (error) {
         console.error('Error compressing file:', error);
       }
     }
-
     setLocalFotos(prev => [...prev, ...newPhotos]);
     setIsCompressing(false);
   };
 
-  const handleRemovePhoto = (indexToRemove: number) => {
-    if (readOnly) return;
-    setLocalFotos(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  const handleSaveEntry = () => {
+    if (readOnly || !localNotas.trim()) {
+      alert("Por favor, escribe lo que has hecho (Notas).");
+      return;
+    }
+    
+    const newEntry: DiarioEntry = {
+      id: `entry-${Date.now()}`,
+      fase: selectedWeek,
+      fecha: new Date().toISOString(),
+      notas: localNotas,
+      fotos: localFotos,
+      skipPh: skipPh,
+      ph: skipPh ? undefined : localPh
+    };
+
+    onSaveDiarioEntry(newEntry);
+    
+    // Also consider the phase completed if they made an entry
+    // Legacy support to unblock the next phase in the UI
+    if (!semanas[selectedWeek]?.completado) {
+       onSaveWeek(selectedWeek, skipPh ? 0 : localPh, localNotas, localFotos);
+    }
+
+    // Reset form
+    setLocalNotas('');
+    setLocalFotos([]);
+    setShowNewEntry(false);
   };
+
+  const getAlertInfo = (val: number) => {
+    if (val < 4.5) {
+      return { level: 'safe', className: 'text-emerald-800 bg-emerald-50 border-emerald-200', badge: '🟢 SEGURO' };
+    } else if (val >= 4.5 && val <= 4.6) {
+      return { level: 'warning', className: 'text-amber-800 bg-amber-50 border-amber-200', badge: '🟡 ALERTA KAHM' };
+    } else {
+      return { level: 'danger', className: 'text-red-800 bg-red-50 border-red-200', badge: '🔴 PELIGRO' };
+    }
+  };
+
+  const currentPhaseEntries = diario
+    .filter(d => d.fase === selectedWeek)
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
       
-      {/* Module Title */}
+      {/* Header */}
       <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
         <div className="p-2 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg">
-          <Calendar className="w-5 h-5" />
+          <BookOpen className="w-5 h-5" />
         </div>
         <div>
           <h2 className="font-bold text-slate-900 text-base uppercase tracking-wider">
-            Bitácora de Control Técnico (Semanas 1 a {Object.keys(semanas).length})
+            Cuaderno de Bitácora Diario
           </h2>
           <p className="text-xs text-slate-500">
             {readOnly 
-              ? 'Visualizando bitácora técnica de seguimiento del alumno. Modo lectura habilitado.'
-              : 'Monitoriza los puntos críticos de control (PCC) de pH y acidez en cada ciclo semanal.'
+              ? 'Visualizando diario de laboratorio del alumno. Modo lectura habilitado.'
+              : 'Registra tus observaciones diarias, añade fotos y mide el pH continuamente.'
             }
           </p>
         </div>
@@ -194,29 +183,31 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
       {/* Week Timeline Selector */}
       <div>
         <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono mb-2.5">
-          Cronograma de Maduración
+          Fases del Proyecto (Cronograma)
         </span>
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
           {Array.from({ length: Object.keys(semanas).length }).map((_, i) => {
             const wNum = i + 1;
-            const log = semanas[wNum];
             const isSelected = selectedWeek === wNum;
-            const isCompleted = log?.completado;
+            const phaseEntries = diario.filter(d => d.fase === wNum);
+            const isCompleted = phaseEntries.length > 0 || semanas[wNum]?.completado;
 
-            // Get status color indicator
-            const phVal = log?.ph ?? 5.5;
             let statusDot = 'bg-slate-300';
             if (isCompleted) {
-              if (phVal < 4.5) statusDot = 'bg-emerald-500';
-              else if (phVal >= 4.5 && phVal < 5.0) statusDot = 'bg-amber-500';
-              else statusDot = 'bg-red-500';
+              const lastPhEntry = phaseEntries.find(d => !d.skipPh);
+              if (lastPhEntry && lastPhEntry.ph !== undefined) {
+                if (lastPhEntry.ph < 4.5) statusDot = 'bg-emerald-500';
+                else if (lastPhEntry.ph < 5.0) statusDot = 'bg-amber-500';
+                else statusDot = 'bg-red-500';
+              } else {
+                 statusDot = 'bg-blue-500'; // Has entries but no pH
+              }
             }
 
             return (
               <button
                 key={wNum}
-                id={`tab-semana-${wNum}`}
-                onClick={() => setSelectedWeek(wNum)}
+                onClick={() => { setSelectedWeek(wNum); setShowNewEntry(false); }}
                 className={`relative flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all cursor-pointer ${
                   isSelected
                     ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
@@ -224,13 +215,11 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
                 }`}
               >
                 <span className="text-[10px] uppercase font-bold font-mono tracking-tighter opacity-70">
-                  SEM
+                  FASE
                 </span>
                 <span className="text-base font-black font-mono leading-none mt-1">
                   0{wNum}
                 </span>
-
-                {/* Status Dot indicator */}
                 <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${statusDot}`} />
               </button>
             );
@@ -238,333 +227,207 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
         </div>
       </div>
 
-      {/* Evolución Histórica de pH Recharts Graph */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>📈 Evolución Histórica del pH</span>
-              <span className="text-[10px] font-mono uppercase bg-slate-200 text-slate-800 px-2 py-0.5 rounded-sm">Tendencia Semanal</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Curva de acidificación biológica frente al umbral bactericida seguro (&lt; 4.5).
-            </p>
-          </div>
-          <div className="flex items-center gap-3 text-[11px] font-mono text-slate-600">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block" /> pH Lote</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-red-500 inline-block" /> Crítico 4.5</span>
-          </div>
-        </div>
-
-        <div ref={chartContainerRef} className="w-full h-56 pt-2 bg-white p-2 rounded-lg border border-slate-100">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 10, right: 15, left: -15, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="semana" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-              <YAxis domain={[3, 7]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                formatter={(value: any) => [typeof value === 'number' ? `${value.toFixed(1)} pH` : 'N/A', 'Nivel de pH']}
-              />
-              <ReferenceLine y={4.5} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'insideTopRight', value: 'Límite Crítico (4.5)', fill: '#ef4444', fontSize: 10 }} />
-              {challenge?.phFinalEsperado && (
-                <ReferenceLine y={challenge.phFinalEsperado} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'insideBottomRight', value: `Meta (${challenge.phFinalEsperado})`, fill: '#10b981', fontSize: 10 }} />
-              )}
-              <Line
-                type="monotone"
-                dataKey="ph"
-                name="pH"
-                stroke="#0f172a"
-                strokeWidth={3}
-                connectNulls
-                dot={{ r: 4, fill: '#0f172a', stroke: '#ffffff', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#0f172a', stroke: '#38bdf8', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="flex justify-end pt-2 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={handleDownloadChartPNG}
-            disabled={isExporting || chartData.length === 0}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold font-sans rounded-lg shadow-2xs transition-all cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{isExporting ? 'Generando PNG...' : 'Descargar Gráfica (PNG)'}</span>
-          </button>
-        </div>
+      {/* Phase Context */}
+      <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-5">
+        <span className="inline-flex items-center gap-1 bg-slate-900 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase mb-1.5">
+          Fase {selectedWeek} {weekConfig ? `— ${weekConfig.fase}` : ''}
+        </span>
+        <h3 className="text-sm font-bold text-slate-800">
+          {weekConfig ? weekConfig.accionAlumno : 'Registro de la fase'}
+        </h3>
+        {weekConfig?.puntoCriticoControl && (
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            <span className="text-red-600 font-bold uppercase mr-1">PCC:</span>
+            {weekConfig.puntoCriticoControl}
+          </p>
+        )}
       </div>
 
-      {/* Active Week Form Controls */}
-      <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-5 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1 bg-slate-900 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase mb-1.5">
-              Semana {selectedWeek} {weekConfig ? `— Fase: ${weekConfig.fase}` : 'Activa'}
-            </span>
-            <h3 className="text-sm font-bold text-slate-800">
-              {weekConfig ? weekConfig.accionAlumno : 'Registro del Punto Crítico de Control'}
-            </h3>
-            {weekConfig?.puntoCriticoControl && (
-              <p className="text-xs font-semibold text-slate-500 mt-1">
-                <span className="text-red-600 font-bold uppercase mr-1">PCC:</span>
-                {weekConfig.puntoCriticoControl}
-              </p>
-            )}
-          </div>
-          <div className="text-xs text-slate-400 font-mono">
-            {(() => {
-              if (!currentLog?.fechaRegistro) return <span>Pendiente de guardar</span>;
-              const date = new Date(currentLog.fechaRegistro);
-              if (isNaN(date.getTime())) return <span>Pendiente de guardar</span>;
-              try {
-                return <span>Registrado: {date.toLocaleDateString()}</span>;
-              } catch (e) {
-                return <span>Pendiente de guardar</span>;
-              }
-            })()}
-          </div>
-        </div>
-
-        {/* pH Range Slider & Validation Highlight */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <div>
-              <label htmlFor="input-ph-range" className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-slate-500" />
-                Control Obligatorio de pH (Seguridad Alimentaria)
-              </label>
-              <p className="text-[10px] text-slate-500 mt-1 max-w-sm">Registra el pH exacto de la elaboración para determinar si es seguro para el consumo.</p>
-              {isUnsafePh && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 animate-pulse mt-1">
-                  <AlertCircle className="w-3.5 h-3.5" /> Valor fuera del rango seguro (&gt; 5.0)
-                </span>
-              )}
-            </div>
-            
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono font-bold text-base transition-all ${
-              isUnsafePh
-                ? 'bg-red-50 border-2 border-red-500 text-red-900 shadow-xs ring-2 ring-red-200'
-                : 'bg-white border border-slate-200 text-slate-900 shadow-2xs'
-            }`}>
-              <span className={`text-[10px] font-semibold uppercase ${isUnsafePh ? 'text-red-700 font-extrabold' : 'text-slate-400'}`}>pH:</span>
-              <input
-                id="valor-ph-actual"
-                type="number"
-                min="3.0"
-                max="7.0"
-                step="0.1"
-                value={localPh}
-                disabled={readOnly}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) setLocalPh(val);
-                }}
-                className="w-16 bg-transparent text-right font-mono font-bold focus:outline-hidden"
-              />
-            </div>
-          </div>
-
-          <div className="relative pt-2">
-            <input
-              id="input-ph-range"
-              type="range"
-              min="3.0"
-              max="7.0"
-              step="0.1"
-              value={localPh}
-              disabled={readOnly}
-              onChange={(e) => setLocalPh(parseFloat(e.target.value))}
-              className={`w-full h-2 rounded-lg appearance-none cursor-pointer focus:outline-hidden disabled:opacity-50 transition-colors ${
-                isUnsafePh ? 'bg-red-200 accent-red-600' : 'bg-slate-200 accent-slate-900'
-              }`}
-            />
-            {/* Range markers */}
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2 px-1">
-              <span>3.0 (Ácido)</span>
-              <span>4.0</span>
-              <span className={isUnsafePh ? 'text-red-600 font-bold' : ''}>4.5 (Punto Crítico)</span>
-              <span className={isUnsafePh ? 'text-red-600 font-bold underline' : ''}>5.0 (Umbral Seguro)</span>
-              <span>6.0</span>
-              <span>7.0 (Neutro)</span>
-            </div>
-          </div>
-
-          {isUnsafePh && (
-            <div className="p-3 bg-red-100/80 border border-red-300 rounded-xl text-xs text-red-900 font-sans flex items-start gap-2 shadow-2xs animate-pulse">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
-              <div>
-                <strong className="font-bold">¡ALERTA DE SEGURIDAD CRÍTICA!</strong> El valor de pH ({localPh.toFixed(1)}) supera el límite seguro (&gt; 5.0). A este nivel de acidez no se inhiben bacterias patógenas ni mohos indeseados. Calibra el pehachímetro o descarta la muestra.
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Asynchronous Alert Box */}
-        <div
-          id="cuadro-alerta-ph"
-          className={`p-4 rounded-xl border flex items-start gap-3 transition-all duration-300 ${alertInfo.className}`}
-        >
-          <div className="text-xl leading-none pt-0.5">
-            {alertInfo.level === 'safe' && '🟢'}
-            {alertInfo.level === 'warning' && '🟡'}
-            {alertInfo.level === 'danger' && '🔴'}
-          </div>
-          <div>
-            <span className="block font-mono text-xs font-extrabold uppercase tracking-wide">
-              Estatus: {alertInfo.badge}
-            </span>
-            <p className="text-xs font-semibold mt-1 font-sans">
-              {alertInfo.desc}
-            </p>
-            {alertInfo.level === 'danger' && (
-              <span className="block mt-2 text-[10px] uppercase font-bold text-red-600 bg-red-100/50 px-2 py-0.5 rounded-sm w-max">
-                ¡Alerta Sanitaria! Riesgo de Listeria o E. Coli.
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Dynamic Parameters from week config */}
-        {weekConfig?.parametrosRegistrar && weekConfig.parametrosRegistrar.length > 0 && (
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h4 className="text-sm font-bold text-slate-800">Parámetros a Registrar (PCC)</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {weekConfig.parametrosRegistrar.filter(p => p.toLowerCase() !== 'ph').map((paramName) => (
-                <div key={paramName}>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    {paramName}
-                  </label>
-                  <input
-                    type="text"
-                    disabled={readOnly}
-                    value={localParametros[paramName] || ''}
-                    onChange={(e) => setLocalParametros({ ...localParametros, [paramName]: e.target.value })}
-                    placeholder={`Registrar ${paramName}`}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-transparent transition-all disabled:bg-slate-100 disabled:text-slate-500"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Observation text notes */}
-        <div className="space-y-2">
-          <label htmlFor="input-notas-semanales" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Notas de Observación Crítica
-          </label>
-          <textarea
-            id="input-notas-semanales"
-            rows={3}
-            value={localNotas}
-            disabled={readOnly}
-            onChange={(e) => setLocalNotas(e.target.value)}
-            placeholder={readOnly ? "Sin anotaciones." : "Ej: Formación uniforme de corteza, ausencia de mohos oscuros, aroma láctico limpio y ligeramente ácido..."}
-            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-transparent resize-none transition-all disabled:bg-slate-100 disabled:text-slate-500"
-          />
-          <span className="block text-[10px] text-slate-400 font-sans">
-            Registra observaciones clave como textura táctil, humedad externa de la tela quesera y presencia de notas fúngicas.
-          </span>
-        </div>
-
-        {/* Dynamic Image Upload & Gallery */}
-        <div className="space-y-3 pt-2 border-t border-slate-200/60">
-          <div className="flex justify-between items-center">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-emerald-600" />
-              <span>Galería Fotográfica Contextual</span>
-            </label>
-            {!readOnly && (
-              <div className="relative">
-                <input
-                  type="file"
-                  id="week-photo-upload"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="week-photo-upload"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold uppercase rounded-lg cursor-pointer shadow-3xs hover:shadow-2xs transition-all"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Subir Fotos</span>
-                </label>
-              </div>
-            )}
-          </div>
-
-          {isCompressing && (
-            <div className="text-center py-4 bg-slate-100/55 rounded-lg border border-dashed text-xs text-slate-500 animate-pulse">
-              ⚙️ Optimizando y comprimiendo imágenes a alta velocidad...
-            </div>
-          )}
-
-          {localFotos.length === 0 ? (
-            <div className="text-center py-6 bg-slate-50 border border-dashed rounded-lg text-[11px] text-slate-400 italic">
-              No hay fotos vinculadas a este registro semanal. Las fotos que subas quedarán vinculadas exclusivamente a esta fecha.
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {localFotos.map((foto, index) => (
-                <div key={index} className="group relative aspect-square bg-slate-100 border border-slate-200 rounded-lg overflow-hidden shadow-3xs">
-                  <img src={foto} alt={`Foto semanal ${index + 1}`} className="w-full h-full object-cover" />
-                  
-                  {!readOnly && (
-                    <button
-                      onClick={() => handleRemovePhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-md shadow-sm transition-colors cursor-pointer"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Save/Register Action for the current week */}
-        {!readOnly && (
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={handleSave}
-              id="btn-guardar-semana"
-              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded-lg cursor-pointer transition-colors shadow-xs"
-            >
-              <Save className="w-4 h-4 text-emerald-400" />
-              <span>Guardar Semana {selectedWeek}</span>
+      {/* Historical Graph */}
+      {chartData.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
+          <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+            <h3 className="text-sm font-bold text-slate-900">📈 Evolución Histórica del pH</h3>
+            <button onClick={handleDownloadChartPNG} disabled={isExporting} className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-800">
+              <Download className="w-3.5 h-3.5" /> {isExporting ? 'Exportando...' : 'Exportar PNG'}
             </button>
           </div>
-        )}
+          <div ref={chartContainerRef} className="h-56 w-full pt-4 bg-white rounded-lg border border-slate-100 p-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="fechaStr" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} />
+                <YAxis domain={[3.0, 7.5]} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                  itemStyle={{ color: '#38bdf8', fontWeight: 'bold' }}
+                />
+                <ReferenceLine y={4.5} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top', value: 'Punto Crítico (4.5)', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} />
+                <Line type="monotone" dataKey="ph" name="pH Registrado" stroke="#0f172a" strokeWidth={3} dot={{ r: 4, fill: '#0f172a', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#38bdf8' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
-      </div>
-
-      {/* Week Progress Summary */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-slate-500" />
-          <span className="text-xs font-semibold text-slate-700">
-            Progreso del Reto:
-          </span>
-          <span className="text-xs font-mono font-bold bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">
-            {Object.values(semanas).filter((s: any) => s.completado).length} de {Object.keys(semanas).length} semanas completas
-          </span>
+      {/* Entries List */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Entradas del Diario ({currentPhaseEntries.length})
+          </h3>
+          {!readOnly && !showNewEntry && (
+            <button 
+              onClick={() => setShowNewEntry(true)}
+              className="px-3 py-1.5 bg-slate-900 text-white text-[10px] uppercase font-bold rounded-lg flex items-center gap-1 hover:bg-slate-800"
+            >
+              <Plus className="w-3.5 h-3.5" /> Nueva Entrada
+            </button>
+          )}
         </div>
 
-        {selectedWeek === Object.keys(semanas).length && (
-          <div className="animate-pulse bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-            <span>✨</span>
-            <span>¡Fase Final! Desbloquea la Evaluación Sensorial a continuación.</span>
+        {/* New Entry Form */}
+        {showNewEntry && !readOnly && (
+          <div className="p-5 border-2 border-slate-900 rounded-xl bg-slate-50 space-y-5 shadow-sm">
+            <h4 className="font-bold text-slate-900">Nueva Entrada Diaria</h4>
+            
+            {/* Notas */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Lo que he hecho / Observaciones</label>
+              <textarea
+                rows={3}
+                value={localNotas}
+                onChange={(e) => setLocalNotas(e.target.value)}
+                placeholder="Describe tus acciones y observaciones del día..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-slate-900 outline-hidden resize-none"
+              />
+            </div>
+
+            {/* pH Control */}
+            <div className="p-4 border border-slate-200 bg-white rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-slate-500" />
+                  Control de pH
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={skipPh} 
+                    onChange={(e) => setSkipPh(e.target.checked)}
+                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  Omitir medición hoy (No recomendado)
+                </label>
+              </div>
+
+              {!skipPh && (
+                <div className="pt-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-slate-500">Desliza para ajustar:</span>
+                    <span className={`font-mono font-bold px-2 py-1 rounded text-sm ${isUnsafePh ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+                      pH {localPh.toFixed(1)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="3.0" max="7.0" step="0.1"
+                    value={localPh}
+                    onChange={(e) => setLocalPh(parseFloat(e.target.value))}
+                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isUnsafePh ? 'bg-red-200 accent-red-600' : 'bg-slate-200 accent-slate-900'}`}
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2">
+                    <span>3.0</span>
+                    <span className={isUnsafePh ? 'text-red-600 font-bold' : ''}>4.5 (Crítico)</span>
+                    <span className={isUnsafePh ? 'text-red-600 font-bold underline' : ''}>5.0 (Seguro)</span>
+                    <span>7.0</span>
+                  </div>
+                  {isUnsafePh && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800 font-semibold animate-pulse flex gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      El valor de pH supera el límite seguro (&gt; 5.0).
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Photos */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center gap-1.5">
+                <Camera className="w-4 h-4" /> Fotos (Evidencia)
+              </label>
+              <input type="file" multiple accept="image/*" id="daily-photo" className="hidden" onChange={handleFileChange} />
+              <label htmlFor="daily-photo" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[10px] font-bold uppercase rounded-lg cursor-pointer transition-colors">
+                <Upload className="w-3.5 h-3.5" /> Subir Fotos
+              </label>
+              
+              {isCompressing && <p className="text-xs text-slate-500 mt-2 animate-pulse">Comprimiendo...</p>}
+              
+              {localFotos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                  {localFotos.map((f, i) => (
+                    <div key={i} className="relative aspect-square bg-slate-100 rounded overflow-hidden">
+                      <img src={f} className="w-full h-full object-cover" />
+                      <button onClick={() => setLocalFotos(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded shadow cursor-pointer">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+              <button onClick={() => setShowNewEntry(false)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg">Cancelar</button>
+              <button onClick={handleSaveEntry} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-lg flex items-center gap-1">
+                <Save className="w-4 h-4" /> Guardar Entrada
+              </button>
+            </div>
           </div>
         )}
-      </div>
 
+        {/* List of past entries */}
+        <div className="space-y-4 mt-4">
+          {currentPhaseEntries.length === 0 ? (
+            <div className="p-6 text-center border border-dashed border-slate-300 rounded-xl bg-slate-50">
+              <p className="text-sm text-slate-500 italic">No hay entradas para esta fase todavía.</p>
+            </div>
+          ) : (
+            currentPhaseEntries.map((entry, idx) => (
+              <div key={entry.id || idx} className="p-4 border border-slate-200 rounded-xl bg-white shadow-xs">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-slate-500 font-mono">
+                    {new Date(entry.fecha).toLocaleString()}
+                  </span>
+                  {!entry.skipPh && entry.ph !== undefined && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getAlertInfo(entry.ph).className}`}>
+                      pH {entry.ph.toFixed(1)}
+                    </span>
+                  )}
+                  {entry.skipPh && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wider">
+                      pH Omitido
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-800 whitespace-pre-wrap">{entry.notas}</p>
+                
+                {entry.fotos && entry.fotos.length > 0 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                    {entry.fotos.map((f, i) => (
+                      <div key={i} className="aspect-square bg-slate-100 rounded overflow-hidden">
+                        <img src={f} className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(f, '_blank')} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };
