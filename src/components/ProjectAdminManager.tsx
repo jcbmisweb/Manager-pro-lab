@@ -18,15 +18,21 @@ export const ProjectAdminManager: React.FC<ProjectAdminManagerProps> = ({ challe
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'infographicUrl' | 'pdfUrl') => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log(`Subiendo archivo: ${file.name} para campo ${field}, tamaño: ${file.size} bytes`);
+      if (file.size > 1024 * 1024) { // 1MB limit
+        alert("El archivo es demasiado grande (máximo 1MB).");
+        return;
+      }
       setUploading(prev => ({ ...prev, [field]: true }));
       try {
         const storageRef = ref(storage, `challenges/${editedChallenge.id}/${field}/${file.name}`);
         const snapshot = await uploadBytes(storageRef, file);
         const downloadUrl = await getDownloadURL(snapshot.ref);
+        console.log(`Subida exitosa: ${downloadUrl}`);
         setEditedChallenge({...editedChallenge, [field]: downloadUrl});
       } catch (error) {
         console.error("Error uploading file:", error);
-        alert("Error al subir el archivo.");
+        alert("Error al subir el archivo: " + (error as Error).message);
       } finally {
         setUploading(prev => ({ ...prev, [field]: false }));
       }
