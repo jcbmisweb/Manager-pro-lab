@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Clipboard, Wand2, ArrowRight, Trash2, Database, Zap } from 'lucide-react';
 import { CHALLENGES, MODULO_INFO, Challenge } from '../types';
 import { db } from '../firebase';
-import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, onSnapshot, collection, updateDoc } from 'firebase/firestore';
+import { ProjectAdminManager } from './ProjectAdminManager';
 
 const PROMPT_MAESTRO = `Actúa como un experto en digitalización de laboratorios. Tu tarea es extraer la información de un documento de laboratorio y convertirla a un formato JSON estrictamente estructurado para la aplicación 'Eco-Lab'. El JSON debe tener la siguiente estructura:
 {
@@ -23,6 +24,7 @@ export function RetoCreator() {
   const [incluirInfografia, setIncluirInfografia] = useState(true);
   const [retos, setRetos] = useState<any[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingChallenge, setEditingChallenge] = useState<any | null>(null);
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -219,45 +221,80 @@ export function RetoCreator() {
         <h2 className="text-2xl font-bold mb-6">Gestión de Retos</h2>
         
         <div className="mb-6 space-y-6">
-          <h3 className="text-lg font-semibold text-slate-300">Retos Actuales - Base de datos</h3>
-          <div className="space-y-4">
-            {allProjects.map((reto: any) => (
-              <div 
-                key={reto.id} 
-                className="bg-slate-800 rounded-xl border border-slate-700 p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <Database size={16} className="text-blue-400" />
-                  <div>
-                    <span className="font-semibold text-slate-100 block">{reto.name || reto.titulo} ({reto.id})</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                   <label className="flex items-center gap-2 text-sm text-slate-300">
-                     <input 
-                       type="checkbox" 
-                       checked={reto.isPublished || false}
-                       onChange={async (e) => {
-                         const isPublished = e.target.checked;
-                         await updateDoc(doc(db, "ManagerproLab", reto.id), { isPublished });
-                       }}
-                     />
-                     Publicar
-                   </label>
-                  <button 
-                    onClick={() => { borrarReto(reto.id, 'dinamico'); }}
-                    className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
-                    title="Borrar reto"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+          {['A', 'B', 'C'].map((bloque) => {
+            const retosEnBloque = allProjects.filter(p => (p.bloque || 'A') === bloque);
+            
+            return (
+              <div key={bloque} className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <h3 className="text-lg font-bold text-slate-300 mb-4">Bloque {bloque}</h3>
+                <div className="space-y-4">
+                  {retosEnBloque.length > 0 ? (
+                    retosEnBloque.map((reto: any) => (
+                      <div 
+                        key={reto.id} 
+                        className="bg-slate-800 rounded-xl border border-slate-700 p-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Database size={16} className="text-blue-400" />
+                          <div>
+                            <span className="font-semibold text-slate-100 block">{reto.name || reto.titulo}</span>
+                            <span className="text-xs text-slate-400">Estado: {reto.isPublished ? "Publicado (Visible)" : "Borrador (Oculto)"}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                             <span className="text-xs text-slate-400">PUBLICAR</span>
+                             <button 
+                               onClick={async () => {
+                                 const isPublished = !reto.isPublished;
+                                 await updateDoc(doc(db, "ManagerproLab", reto.id), { isPublished });
+                               }}
+                               className={`w-10 h-5 rounded-full p-1 transition-colors ${reto.isPublished ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                             >
+                               <div className={`w-3 h-3 bg-white rounded-full transition-transform ${reto.isPublished ? 'translate-x-5' : 'translate-x-0'}`} />
+                             </button>
+                          </div>
+                          <button 
+                            className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700"
+                            onClick={() => setEditingChallenge(reto)}
+                          >
+                            GESTIONAR
+                          </button>
+                          <button 
+                            onClick={() => { borrarReto(reto.id, 'dinamico'); }}
+                            className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                            title="Borrar reto"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-slate-600 text-sm italic">Sin retos en este bloque.</p>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
+      
+      {editingChallenge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-4xl">
+            <ProjectAdminManager 
+              challenge={editingChallenge as Challenge} 
+              onClose={() => setEditingChallenge(null)}
+              onSave={async (updatedChallenge) => {
+                await setDoc(doc(db, "ManagerproLab", updatedChallenge.id), updatedChallenge);
+                setEditingChallenge(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
