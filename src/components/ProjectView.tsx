@@ -33,16 +33,23 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, on
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {challenge.infographicUrl && (
-                  <img src={challenge.infographicUrl} alt="Infografía" className="w-full rounded-2xl border border-slate-200 shadow-sm" />
+                  <a 
+                    href={challenge.infographicUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center p-4 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 hover:bg-slate-200 transition-colors gap-2 font-bold"
+                  >
+                    <span>🖼️</span> Descargar Infografía
+                  </a>
                 )}
                 {challenge.pdfUrl && (
                   <a 
                     href={challenge.pdfUrl} 
-                    download={`${challenge.name}.pdf`}
-                    className="flex flex-col items-center justify-center p-8 bg-blue-50 rounded-2xl border border-blue-200 text-blue-800 hover:bg-blue-100 transition-colors gap-4"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center p-4 bg-blue-100 rounded-xl border border-blue-200 text-blue-800 hover:bg-blue-200 transition-colors gap-2 font-bold"
                   >
-                    <span className="text-4xl">📄</span>
-                    <span className="font-bold text-center">Descargar Ficha Técnica (PDF)</span>
+                    <span>📄</span> Descargar Ficha Técnica (PDF)
                   </a>
                 )}
               </div>
