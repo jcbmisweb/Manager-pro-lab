@@ -52,6 +52,10 @@ export interface Mensaje {
   mensaje: string;
   fecha: string;
   leido: boolean;
+  emisorNombre?: string;
+  tipo?: 'individual' | 'grupal';
+  aulaId?: string;
+  leidos?: string[];
 }
 
 export interface UserSession {

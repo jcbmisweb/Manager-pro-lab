@@ -775,7 +775,22 @@ export default function App() {
 
   // Find conversations and unread counts for messenger alert
   const unreadMessagesCount = user ? 
-    mensajes.filter((m: any) => m.receptorId === user.id && !m.leido).length : 0;
+    mensajes.filter((m: any) => {
+      if (m.tipo === 'grupal') {
+        if (m.emisorId === user.id) return false;
+        let hasAccess = false;
+        if (user.role === 'alumno') {
+          hasAccess = m.aulaId === user.aulaId;
+        } else if (user.role === 'profesor') {
+          hasAccess = aulas.some(a => a.id === m.aulaId && a.profesorId === user.id);
+        } else if (user.role === 'admin') {
+          hasAccess = true;
+        }
+        return hasAccess && !(m.leidos || []).includes(user.id);
+      } else {
+        return m.receptorId === user.id && !m.leido;
+      }
+    }).length : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-800 flex flex-col justify-between">
