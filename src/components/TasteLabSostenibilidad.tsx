@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   Sliders, 
   Coins, 
@@ -727,12 +728,12 @@ export const TasteLabSostenibilidad: React.FC<TasteLabSostenibilidadProps> = ({
 
             {/* Dynamic Real QR Code */}
             <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-3xs flex flex-col items-center justify-center">
-              <div className="w-32 h-32 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-lg overflow-hidden">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
-                  alt="Código QR de la encuesta"
-                  className="w-28 h-28"
-                  referrerPolicy="no-referrer"
+              <div className="w-32 h-32 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-lg overflow-hidden p-2">
+                <QRCodeSVG 
+                  value={shareUrl}
+                  size={112}
+                  level="Q"
+                  includeMargin={false}
                 />
               </div>
               <span className="block text-[9px] text-slate-400 font-mono mt-2 uppercase tracking-wide">
