@@ -332,11 +332,13 @@ export const BitacoraControl: React.FC<BitacoraControlProps> = ({
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <div>
-              <label htmlFor="input-ph-range" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Medición de pH de la Pasta
+              <label htmlFor="input-ph-range" className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-slate-500" />
+                Control Obligatorio de pH (Seguridad Alimentaria)
               </label>
+              <p className="text-[10px] text-slate-500 mt-1 max-w-sm">Registra el pH exacto de la elaboración para determinar si es seguro para el consumo.</p>
               {isUnsafePh && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 animate-pulse mt-0.5">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 animate-pulse mt-1">
                   <AlertCircle className="w-3.5 h-3.5" /> Valor fuera del rango seguro (&gt; 5.0)
                 </span>
               )}

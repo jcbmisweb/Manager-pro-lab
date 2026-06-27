@@ -1,5 +1,6 @@
 import React from 'react';
 import { Challenge } from '../types';
+import { PhProtocol } from './PhProtocol';
 
 interface ProjectViewProps {
   challenge: Challenge;
@@ -147,6 +148,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ challenge, onClose, on
               </div>
             </section>
           )}
+
+          <PhProtocol />
           
           {/* Action Footer */}
           <div className="pt-8 flex justify-end gap-4 border-t border-slate-200">

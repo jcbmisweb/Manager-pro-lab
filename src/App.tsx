@@ -257,7 +257,24 @@ export default function App() {
       const u4 = onSnapshot(collection(db, "mensajes"), (snapshot) => {
         setMensajes(snapshot.docs.map(doc => doc.data() as any));
       }, (err) => console.warn("mensajes listener error:", err));
-      unsubs.push(u1, u2, u3, u4);
+      
+      const u5 = onSnapshot(collection(db, "ManagerproLab"), (snapshot) => {
+        if (!snapshot.empty) {
+          // Sort them by code or id so they appear in order
+          const fetchedChallenges = snapshot.docs.map(doc => doc.data() as Challenge);
+          fetchedChallenges.sort((a, b) => a.id.localeCompare(b.id));
+          setChallengesState(fetchedChallenges);
+        } else {
+          // Seed the initial challenges if empty
+          const batch = writeBatch(db);
+          CHALLENGES.forEach(c => {
+            batch.set(doc(db, "ManagerproLab", c.id), c);
+          });
+          batch.commit().catch(console.error);
+        }
+      }, (err) => console.warn("ManagerproLab listener error:", err));
+
+      unsubs.push(u1, u2, u3, u4, u5);
     }).catch(err => console.warn("runMigration promise error:", err));
 
     return () => {
@@ -1287,8 +1304,9 @@ export default function App() {
                                 challenge={challengesState.find(c => c.id === managingChallengeId)!} 
                                 onClose={() => setManagingChallengeId(null)}
                                 onSave={(updatedChallenge) => {
-                                  setChallengesState(prev => prev.map(c => c.id === updatedChallenge.id ? updatedChallenge : c));
-                                  setManagingChallengeId(null);
+                                  updateDoc(doc(db, "ManagerproLab", updatedChallenge.id), updatedChallenge as any)
+                                    .then(() => setManagingChallengeId(null))
+                                    .catch(console.error);
                                 }}
                               />
                             ) : (
@@ -1326,7 +1344,8 @@ export default function App() {
                                                     className="sr-only" 
                                                     checked={!!c.isPublished}
                                                     onChange={() => {
-                                                      setChallengesState(prev => prev.map(ch => ch.id === c.id ? { ...ch, isPublished: !ch.isPublished } : ch))
+                                                      updateDoc(doc(db, "ManagerproLab", c.id), { isPublished: !c.isPublished })
+                                                        .catch(console.error);
                                                     }}
                                                   />
                                                   <div className={`block w-10 h-6 rounded-full transition-colors ${c.isPublished ? 'bg-green-500' : 'bg-slate-300'}`}></div>
@@ -1549,6 +1568,32 @@ export default function App() {
                                     {p.nombre}
                                   </h4>
                                   <p className="text-[10px] text-slate-400 font-medium">Inoculante: {p.tipoInoculante}</p>
+                                  
+                                  {/* pH Traffic Light Indicator */}
+                                  {(() => {
+                                    const logEntries = Object.values(p.semanas) as any[];
+                                    const completedLogs = logEntries.filter(w => w.completado && w.ph !== undefined).sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime());
+                                    const latestLog = completedLogs[0];
+                                    if (!latestLog) return null;
+                                    
+                                    const val = latestLog.ph;
+                                    let badge = '🟢 Seguro';
+                                    let colorCls = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                                    
+                                    if (val >= 4.5 && val <= 4.6) {
+                                      badge = '🟡 Alerta Kahm';
+                                      colorCls = 'text-amber-700 bg-amber-50 border-amber-200';
+                                    } else if (val > 4.6) {
+                                      badge = '🔴 Peligro (Descartar)';
+                                      colorCls = 'text-red-700 bg-red-50 border-red-200';
+                                    }
+                                    
+                                    return (
+                                      <div className={`mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider ${colorCls}`}>
+                                        pH Actual: {val.toFixed(1)} - {badge}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
                                 <div className="flex gap-2">
